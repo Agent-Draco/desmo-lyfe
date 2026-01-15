@@ -1,0 +1,136 @@
+import { motion } from "framer-motion";
+import { Package, AlertTriangle, Clock, TrendingUp } from "lucide-react";
+import { StatsCard } from "@/components/StatsCard";
+import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
+import { InventoryItem } from "@/components/InventoryItem";
+import { AnimatePresence } from "framer-motion";
+
+interface HomeViewProps {
+  inventory: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    expiryDate: Date;
+    addedBy: string;
+    addedAt: Date;
+    isInStock: boolean;
+  }>;
+  onItemClick: (id: string) => void;
+  onQuickAdd: (name: string) => void;
+}
+
+export const HomeView = ({ inventory, onItemClick, onQuickAdd }: HomeViewProps) => {
+  const expiringCount = inventory.filter((item) => {
+    const days = Math.ceil(
+      (item.expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    return days <= 2 && days > 0;
+  }).length;
+
+  const inStockCount = inventory.filter(item => item.isInStock).length;
+
+  return (
+    <>
+      {/* Stats Section */}
+      <section className="mb-8">
+        <motion.h2
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider"
+        >
+          Overview
+        </motion.h2>
+        
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Total Items"
+            value={inventory.length}
+            icon={Package}
+            trend="up"
+            trendValue="3"
+            delay={0}
+          />
+          <StatsCard
+            title="Expiring Soon"
+            value={expiringCount}
+            icon={AlertTriangle}
+            variant="warning"
+            delay={0.1}
+          />
+          <StatsCard
+            title="In Stock"
+            value={inStockCount}
+            icon={TrendingUp}
+            variant="success"
+            delay={0.2}
+          />
+          <StatsCard
+            title="Last Scan"
+            value="30m"
+            icon={Clock}
+            delay={0.3}
+          />
+        </div>
+      </section>
+
+      {/* Quick Add Section */}
+      <section className="mb-8">
+        <motion.h2
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider"
+        >
+          Quick Add
+        </motion.h2>
+        
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+          {quickAddPresets.map((preset, i) => (
+            <QuickAddPreset
+              key={preset.name}
+              name={preset.name}
+              emoji={preset.emoji}
+              onClick={() => onQuickAdd(preset.name)}
+              delay={0.3 + i * 0.05}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Recent Items */}
+      <section>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+          className="flex items-center justify-between mb-4"
+        >
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            Recent Items
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {inventory.length} items
+          </span>
+        </motion.div>
+        
+        <div className="space-y-3">
+          <AnimatePresence>
+            {inventory.slice(0, 3).map((item, i) => (
+              <InventoryItem
+                key={item.id}
+                name={item.name}
+                quantity={item.quantity}
+                expiryDate={item.expiryDate}
+                addedBy={item.addedBy}
+                addedAt={item.addedAt}
+                isInStock={item.isInStock}
+                onClick={() => onItemClick(item.id)}
+                delay={0.5 + i * 0.1}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      </section>
+    </>
+  );
+};
