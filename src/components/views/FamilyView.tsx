@@ -1,20 +1,48 @@
 import { motion } from "framer-motion";
-import { Users, Copy, UserPlus, Crown } from "lucide-react";
+import { Users, Copy, Crown, Loader2 } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
+import { useToast } from "@/hooks/use-toast";
+import { useHouseholdMembers, HouseholdMember } from "@/hooks/useHouseholdMembers";
+import { Household } from "@/hooks/useAuth";
 
-const mockFamily = [
-  { id: "1", name: "Sarah", avatar: "S", isOwner: true },
-  { id: "2", name: "Mike", avatar: "M", isOwner: false },
-  { id: "3", name: "Emma", avatar: "E", isOwner: false },
-  { id: "4", name: "Jack", avatar: "J", isOwner: false },
-];
+interface FamilyViewProps {
+  household: Household | null;
+  currentUserId: string | null;
+}
 
-const inviteCode = "SMITH-2024";
+export const FamilyView = ({ household, currentUserId }: FamilyViewProps) => {
+  const { members, loading } = useHouseholdMembers(household?.id || null);
+  const { toast } = useToast();
 
-export const FamilyView = () => {
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(inviteCode);
+    if (household?.invite_code) {
+      navigator.clipboard.writeText(household.invite_code);
+      toast({
+        title: "Copied!",
+        description: "Invite code copied to clipboard",
+      });
+    }
   };
+
+  if (!household) {
+    return (
+      <section className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">No Household</h2>
+          <p className="text-muted-foreground">Create or join a household first</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (loading) {
+    return (
+      <section className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </section>
+    );
+  }
 
   return (
     <section>
@@ -23,7 +51,7 @@ export const FamilyView = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        <h2 className="text-xl font-semibold text-foreground">Family</h2>
+        <h2 className="text-xl font-semibold text-foreground">{household.name}</h2>
         <p className="text-sm text-muted-foreground mt-1">Manage your household members</p>
       </motion.div>
 
@@ -32,7 +60,9 @@ export const FamilyView = () => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground mb-1">Invite Code</p>
-            <p className="text-lg font-mono font-bold text-foreground">{inviteCode}</p>
+            <p className="text-lg font-mono font-bold text-foreground">
+              {household.invite_code}
+            </p>
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -55,42 +85,31 @@ export const FamilyView = () => {
         transition={{ delay: 0.2 }}
         className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider"
       >
-        Members ({mockFamily.length})
+        Members ({members.length})
       </motion.h3>
 
       <div className="space-y-3">
-        {mockFamily.map((member, i) => (
+        {members.map((member, i) => (
           <GlassCard key={member.id} delay={0.3 + i * 0.1} className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center">
-              <span className="text-lg font-semibold text-primary">{member.avatar}</span>
+              <span className="text-lg font-semibold text-primary">
+                {(member.display_name || "U")[0].toUpperCase()}
+              </span>
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h4 className="font-semibold text-foreground">{member.name}</h4>
-                {member.isOwner && (
-                  <Crown className="w-4 h-4 text-warning" />
+                <h4 className="font-semibold text-foreground">
+                  {member.display_name || "Unknown"}
+                </h4>
+                {member.id === currentUserId && (
+                  <span className="text-xs text-muted-foreground">(you)</span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
-                {member.isOwner ? "Owner" : "Member"}
-              </p>
+              <p className="text-sm text-muted-foreground">Member</p>
             </div>
           </GlassCard>
         ))}
       </div>
-
-      {/* Add Member Button */}
-      <motion.button
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        className="w-full mt-6 py-4 rounded-2xl glass-button flex items-center justify-center gap-2 font-semibold"
-      >
-        <UserPlus className="w-5 h-5" />
-        Invite Member
-      </motion.button>
     </section>
   );
 };
