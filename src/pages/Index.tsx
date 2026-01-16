@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { GlassNav } from "@/components/GlassNav";
@@ -10,88 +11,62 @@ import { ScanView } from "@/components/views/ScanView";
 import { FamilyView } from "@/components/views/FamilyView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { cn } from "@/lib/utils";
-
-// Mock data for demonstration
-const mockInventory = [
-  {
-    id: "1",
-    name: "Organic Whole Milk",
-    quantity: 2,
-    expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 1),
-    addedBy: "Sarah",
-    addedAt: new Date(Date.now() - 1000 * 60 * 30),
-    isInStock: true,
-  },
-  {
-    id: "2",
-    name: "Free-Range Eggs",
-    quantity: 12,
-    expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
-    addedBy: "Mike",
-    addedAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    isInStock: true,
-  },
-  {
-    id: "3",
-    name: "Sourdough Bread",
-    quantity: 1,
-    expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2),
-    addedBy: "Sarah",
-    addedAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
-    isInStock: true,
-  },
-  {
-    id: "4",
-    name: "Greek Yogurt",
-    quantity: 0,
-    expiryDate: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    addedBy: "Mike",
-    addedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
-    isInStock: false,
-  },
-  {
-    id: "5",
-    name: "Fresh Spinach",
-    quantity: 1,
-    expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3),
-    addedBy: "Sarah",
-    addedAt: new Date(Date.now() - 1000 * 60 * 60 * 8),
-    isInStock: true,
-  },
-];
+import { useAuth } from "@/hooks/useAuth";
+import { useInventory } from "@/hooks/useInventory";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("home");
   const [removalMode, setRemovalMode] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
-  const [inventory] = useState(mockInventory);
+  const navigate = useNavigate();
 
-  const handleItemClick = (id: string) => {
+  const { user, profile, household, loading: authLoading, signOut, hasHousehold } = useAuth();
+  const { items: inventory, loading: inventoryLoading, addItem, decrementItem } = useInventory(household?.id || null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    } else if (!authLoading && user && !hasHousehold) {
+      navigate("/onboarding");
+    }
+  }, [authLoading, user, hasHousehold, navigate]);
+
+  const handleItemClick = async (id: string) => {
     if (removalMode) {
-      setShowFlash(true);
-      setTimeout(() => setShowFlash(false), 300);
-      console.log(`Removed item ${id}`);
+      const success = await decrementItem(id);
+      if (success) {
+        setShowFlash(true);
+        setTimeout(() => setShowFlash(false), 300);
+      }
     }
   };
 
-  const handleQuickAdd = (name: string) => {
-    console.log(`Quick adding: ${name}`);
+  const handleQuickAdd = async (name: string) => {
+    await addItem({ name });
   };
 
-  const handleScan = () => {
-    console.log("Starting scan...");
-  };
-
-  const handleManualEntry = () => {
-    console.log("Manual entry...");
+  const handleAddItem = async (item: { name: string; barcode?: string; category?: string }) => {
+    return await addItem(item);
   };
 
   const expiringCount = inventory.filter((item) => {
+    if (!item.expiry_date) return false;
     const days = Math.ceil(
-      (item.expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (new Date(item.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
     return days <= 2 && days > 0;
   }).length;
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user || !hasHousehold) return null;
 
   const renderView = () => {
     switch (activeTab) {
@@ -101,6 +76,7 @@ const Index = () => {
             inventory={inventory}
             onItemClick={handleItemClick}
             onQuickAdd={handleQuickAdd}
+            loading={inventoryLoading}
           />
         );
       case "inventory":
@@ -108,19 +84,15 @@ const Index = () => {
           <InventoryView
             inventory={inventory}
             onItemClick={handleItemClick}
+            loading={inventoryLoading}
           />
         );
       case "scan":
-        return (
-          <ScanView
-            onScan={handleScan}
-            onManualEntry={handleManualEntry}
-          />
-        );
+        return <ScanView onAddItem={handleAddItem} />;
       case "family":
-        return <FamilyView />;
+        return <FamilyView household={household} currentUserId={user?.id || null} />;
       case "settings":
-        return <SettingsView />;
+        return <SettingsView profile={profile} household={household} onSignOut={signOut} />;
       default:
         return null;
     }
@@ -133,8 +105,8 @@ const Index = () => {
     )}>
       <SuccessFlash isVisible={showFlash} />
       <Header 
-        userName="Sarah" 
-        householdName="The Smith Kitchen"
+        userName={profile?.display_name || "User"} 
+        householdName={household?.name || "Kitchen"}
         notificationCount={expiringCount}
       />
       
