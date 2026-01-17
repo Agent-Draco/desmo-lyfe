@@ -1,33 +1,28 @@
 import { motion } from "framer-motion";
-import { Package, AlertTriangle, Clock, TrendingUp } from "lucide-react";
+import { Package, AlertTriangle, Clock, TrendingUp, Loader2 } from "lucide-react";
 import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
 import { AnimatePresence } from "framer-motion";
+import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
 
 interface HomeViewProps {
-  inventory: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    expiryDate: Date;
-    addedBy: string;
-    addedAt: Date;
-    isInStock: boolean;
-  }>;
+  inventory: InventoryItemType[];
   onItemClick: (id: string) => void;
   onQuickAdd: (name: string) => void;
+  loading?: boolean;
 }
 
-export const HomeView = ({ inventory, onItemClick, onQuickAdd }: HomeViewProps) => {
+export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeViewProps) => {
   const expiringCount = inventory.filter((item) => {
+    if (!item.expiry_date) return false;
     const days = Math.ceil(
-      (item.expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (new Date(item.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
     return days <= 2 && days > 0;
   }).length;
 
-  const inStockCount = inventory.filter(item => item.isInStock).length;
+  const inStockCount = inventory.filter(item => !item.is_out).length;
 
   return (
     <>
@@ -113,23 +108,29 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd }: HomeViewProps) 
           </span>
         </motion.div>
         
-        <div className="space-y-3">
-          <AnimatePresence>
-            {inventory.slice(0, 3).map((item, i) => (
-              <InventoryItem
-                key={item.id}
-                name={item.name}
-                quantity={item.quantity}
-                expiryDate={item.expiryDate}
-                addedBy={item.addedBy}
-                addedAt={item.addedAt}
-                isInStock={item.isInStock}
-                onClick={() => onItemClick(item.id)}
-                delay={0.5 + i * 0.1}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence>
+              {inventory.slice(0, 3).map((item, i) => (
+                <InventoryItem
+                  key={item.id}
+                  name={item.name}
+                  quantity={item.quantity}
+                  expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
+                  addedBy={item.profile?.display_name || undefined}
+                  addedAt={new Date(item.created_at)}
+                  isInStock={!item.is_out}
+                  onClick={() => onItemClick(item.id)}
+                  delay={0.5 + i * 0.1}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
       </section>
     </>
   );

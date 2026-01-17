@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Bell, Plus } from "lucide-react";
+import desmoLogo from "@/assets/desmo-logo.png";
 
 interface HeaderProps {
   userName?: string;
@@ -25,11 +26,9 @@ export const Header = ({
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring", bounce: 0.4 }}
-            className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center"
+            className="w-10 h-10 rounded-lg overflow-hidden bg-background/50 flex items-center justify-center p-1"
           >
-            <span className="text-lg font-semibold text-primary">
-              {userName.charAt(0).toUpperCase()}
-            </span>
+            <img src={desmoLogo} alt="Desmo" className="w-full h-full object-contain" />
           </motion.div>
           <div>
             <motion.p

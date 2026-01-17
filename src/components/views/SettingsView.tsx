@@ -1,6 +1,26 @@
 import { motion } from "framer-motion";
-import { User, Bell, Moon, Shield, LogOut, ChevronRight } from "lucide-react";
+import { User, Bell, Moon, Shield, LogOut, ChevronRight, Settings } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
+import { useNavigate } from "react-router-dom";
+
+interface Profile {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  household_id: string | null;
+}
+
+interface Household {
+  id: string;
+  name: string;
+  invite_code: string;
+}
+
+interface SettingsViewProps {
+  profile: Profile | null;
+  household: Household | null;
+  onSignOut: () => Promise<void>;
+}
 
 const settingsItems = [
   { id: "profile", icon: User, label: "Profile", description: "Manage your account" },
@@ -9,7 +29,10 @@ const settingsItems = [
   { id: "privacy", icon: Shield, label: "Privacy", description: "Data & security" },
 ];
 
-export const SettingsView = () => {
+export const SettingsView = ({ profile, household, onSignOut }: SettingsViewProps) => {
+  const navigate = useNavigate();
+  const displayInitial = profile?.display_name?.charAt(0).toUpperCase() || "U";
+
   return (
     <section>
       <motion.div
@@ -24,11 +47,27 @@ export const SettingsView = () => {
       {/* Profile Card */}
       <GlassCard className="mb-6 flex items-center gap-4" delay={0.1}>
         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center">
-          <span className="text-2xl font-semibold text-primary">S</span>
+          <span className="text-2xl font-semibold text-primary">{displayInitial}</span>
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-foreground">Sarah Smith</h3>
-          <p className="text-sm text-muted-foreground">sarah@example.com</p>
+          <h3 className="font-semibold text-foreground">{profile?.display_name || "User"}</h3>
+          <p className="text-sm text-muted-foreground">{household?.name || "No household"}</p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+      </GlassCard>
+
+      {/* Vigil Setup Card */}
+      <GlassCard 
+        className="mb-6 flex items-center gap-4 cursor-pointer" 
+        delay={0.15}
+        onClick={() => navigate('/vigil-setup')}
+      >
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Settings className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-medium text-foreground">Vigil Device Setup</h4>
+          <p className="text-sm text-muted-foreground">Connect your Raspberry Pi scanner</p>
         </div>
         <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </GlassCard>
@@ -59,6 +98,7 @@ export const SettingsView = () => {
         transition={{ delay: 0.6 }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
+        onClick={onSignOut}
         className="w-full mt-8 py-4 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center gap-2 font-semibold"
       >
         <LogOut className="w-5 h-5" />
