@@ -1,23 +1,17 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { InventoryItem } from "@/components/InventoryItem";
-import { Grid, List } from "lucide-react";
+import { Grid, List, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
 
 interface InventoryViewProps {
-  inventory: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    expiryDate: Date;
-    addedBy: string;
-    addedAt: Date;
-    isInStock: boolean;
-  }>;
+  inventory: InventoryItemType[];
   onItemClick: (id: string) => void;
+  loading?: boolean;
 }
 
-export const InventoryView = ({ inventory, onItemClick }: InventoryViewProps) => {
+export const InventoryView = ({ inventory, onItemClick, loading }: InventoryViewProps) => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   return (
@@ -55,27 +49,38 @@ export const InventoryView = ({ inventory, onItemClick }: InventoryViewProps) =>
         </div>
       </motion.div>
 
-      <div className={cn(
-        viewMode === "grid" 
-          ? "grid grid-cols-2 md:grid-cols-3 gap-4" 
-          : "space-y-3"
-      )}>
-        <AnimatePresence>
-          {inventory.map((item, i) => (
-            <InventoryItem
-              key={item.id}
-              name={item.name}
-              quantity={item.quantity}
-              expiryDate={item.expiryDate}
-              addedBy={item.addedBy}
-              addedAt={item.addedAt}
-              isInStock={item.isInStock}
-              onClick={() => onItemClick(item.id)}
-              delay={i * 0.05}
-            />
-          ))}
-        </AnimatePresence>
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : inventory.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>No items in inventory yet</p>
+          <p className="text-sm mt-1">Scan items to add them</p>
+        </div>
+      ) : (
+        <div className={cn(
+          viewMode === "grid" 
+            ? "grid grid-cols-2 md:grid-cols-3 gap-4" 
+            : "space-y-3"
+        )}>
+          <AnimatePresence>
+            {inventory.map((item, i) => (
+              <InventoryItem
+                key={item.id}
+                name={item.name}
+                quantity={item.quantity}
+                expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
+                addedBy={item.profile?.display_name || undefined}
+                addedAt={new Date(item.created_at)}
+                isInStock={!item.is_out}
+                onClick={() => onItemClick(item.id)}
+                delay={i * 0.05}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
     </section>
   );
 };
