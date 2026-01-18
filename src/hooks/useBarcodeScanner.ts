@@ -16,7 +16,8 @@ export const useBarcodeScanner = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { toast } = useToast();
 
-  const lookupBarcode = async (barcode: string): Promise<ProductInfo | null> => {
+  // Try Open Food Facts first
+  const lookupOpenFoodFacts = async (barcode: string): Promise<ProductInfo | null> => {
     try {
       const response = await fetch(
         `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`
@@ -25,7 +26,7 @@ export const useBarcodeScanner = () => {
 
       if (data.status === 1 && data.product) {
         return {
-          name: data.product.product_name || data.product.product_name_en || `Product ${barcode}`,
+          name: data.product.product_name || data.product.product_name_en || null,
           brand: data.product.brands,
           category: data.product.categories?.split(",")[0],
           image: data.product.image_small_url,
@@ -33,9 +34,52 @@ export const useBarcodeScanner = () => {
       }
       return null;
     } catch (error) {
-      console.error("Barcode lookup error:", error);
+      console.error("Open Food Facts lookup error:", error);
       return null;
     }
+  };
+
+  // Try USDA FoodData Central as fallback
+  const lookupUSDA = async (barcode: string): Promise<ProductInfo | null> => {
+    try {
+      // USDA FoodData Central API (free, no key required for basic search)
+      const response = await fetch(
+        `https://api.nal.usda.gov/fdc/v1/foods/search?query=${barcode}&dataType=Branded&pageSize=1&api_key=DEMO_KEY`
+      );
+      const data = await response.json();
+
+      if (data.foods && data.foods.length > 0) {
+        const food = data.foods[0];
+        return {
+          name: food.description || food.brandName || null,
+          brand: food.brandOwner || food.brandName,
+          category: food.foodCategory,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error("USDA lookup error:", error);
+      return null;
+    }
+  };
+
+  // Combined lookup - tries both APIs
+  const lookupBarcode = async (barcode: string): Promise<ProductInfo | null> => {
+    // Try Open Food Facts first (better for international products)
+    let result = await lookupOpenFoodFacts(barcode);
+    
+    if (result && result.name) {
+      return result;
+    }
+
+    // Fallback to USDA (better for US products)
+    result = await lookupUSDA(barcode);
+    
+    if (result && result.name) {
+      return result;
+    }
+
+    return null;
   };
 
   const startScanning = useCallback(async () => {

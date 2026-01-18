@@ -136,13 +136,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     setLoading(false);
   };
 
-  const handleMockScan = async () => {
-    setLoading(true);
-    // Simulate scanning random product
-    const mockBarcodes = ["3017620422003", "5449000000996", "8076809513753"];
-    const barcode = mockBarcodes[Math.floor(Math.random() * mockBarcodes.length)];
-    await handleBarcodeDetected(barcode);
-  };
 
   return (
     <section className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -190,22 +183,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
                 </div>
               </GlassCard>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleMockScan}
-                disabled={loading}
-                className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Looking up...
-                  </>
-                ) : (
-                  "Mock Scan (Demo)"
-                )}
-              </motion.button>
             </div>
           </motion.div>
         )}

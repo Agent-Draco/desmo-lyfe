@@ -1,32 +1,78 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { GlassCard } from "@/components/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useVigilSettings } from "@/hooks/useVigilSettings";
-import { ArrowLeft, Loader2, Wifi, Check } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { ArrowLeft, Loader2, Wifi, Check, AlertCircle } from "lucide-react";
 import desmoLogo from "@/assets/desmo-logo.png";
 
 const VigilSetup = () => {
-  const [deviceSerial, setDeviceSerial] = useState("");
-  const [newHouseholdId, setNewHouseholdId] = useState("");
+  const [deviceSerial, setDeviceSerial] = useState("VGL-");
   const [saving, setSaving] = useState(false);
+  const [serialError, setSerialError] = useState("");
   const navigate = useNavigate();
   const { householdId, saveSettings } = useVigilSettings();
+  const { household, loading: authLoading } = useAuth();
+
+  // Auto-fill household ID from user's household
+  const userHouseholdId = household?.id || "";
+
+  // Validate device serial format: VGL-XXX (3 alphanumeric characters after VGL-)
+  const validateSerial = (serial: string): boolean => {
+    const pattern = /^VGL-[A-Z0-9]{3}$/;
+    return pattern.test(serial);
+  };
+
+  const handleSerialChange = (value: string) => {
+    // Always uppercase and ensure it starts with VGL-
+    let formatted = value.toUpperCase();
+    
+    // If user tries to delete VGL-, keep it
+    if (!formatted.startsWith("VGL-")) {
+      formatted = "VGL-" + formatted.replace("VGL-", "").replace("VGL", "");
+    }
+    
+    // Limit to VGL-XXX format (7 chars total)
+    if (formatted.length > 7) {
+      formatted = formatted.slice(0, 7);
+    }
+    
+    setDeviceSerial(formatted);
+    setSerialError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deviceSerial.trim() || !newHouseholdId.trim()) return;
+    
+    if (!validateSerial(deviceSerial)) {
+      setSerialError("Please enter a valid device code (VGL-XXX)");
+      return;
+    }
+    
+    if (!userHouseholdId) {
+      setSerialError("No household found. Please create or join a household first.");
+      return;
+    }
 
     setSaving(true);
-    const result = await saveSettings(deviceSerial.trim(), newHouseholdId.trim());
+    const result = await saveSettings(deviceSerial.trim(), userHouseholdId);
     setSaving(false);
 
     if (result) {
       navigate("/");
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -58,7 +104,7 @@ const VigilSetup = () => {
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground">Setup Vigil Device</h1>
           <p className="text-muted-foreground mt-2">
-            Connect your Raspberry Pi scanner to your household
+            Connect your Vigil scanner to your household
           </p>
         </div>
 
@@ -75,45 +121,64 @@ const VigilSetup = () => {
           </GlassCard>
         )}
 
+        {/* No Household Warning */}
+        {!userHouseholdId && !authLoading && (
+          <GlassCard className="mb-6 flex items-center gap-3 border-destructive/50">
+            <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">No Household Found</p>
+              <p className="text-xs text-muted-foreground">
+                Please create or join a household before setting up a device.
+              </p>
+            </div>
+          </GlassCard>
+        )}
+
         {/* Setup Form */}
         <GlassCard className="p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="deviceSerial">Device Serial Number</Label>
+              <Label htmlFor="deviceSerial">Device Code</Label>
               <div className="relative">
                 <Wifi className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="deviceSerial"
                   type="text"
-                  placeholder="VGL-XXXX-XXXX"
+                  placeholder="VGL-XXX"
                   value={deviceSerial}
-                  onChange={(e) => setDeviceSerial(e.target.value.toUpperCase())}
-                  className="pl-10 font-mono"
+                  onChange={(e) => handleSerialChange(e.target.value)}
+                  className="pl-10 font-mono text-lg tracking-wider"
+                  maxLength={7}
                 />
               </div>
+              {serialError && (
+                <p className="text-sm text-destructive">{serialError}</p>
+              )}
               <p className="text-xs text-muted-foreground">
-                Find this on your Vigil device or in the Raspberry Pi setup
+                Enter the 3-character code from your Vigil device (e.g., VGL-A1B)
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="householdId">Household ID</Label>
-              <Input
-                id="householdId"
-                type="text"
-                placeholder="Enter your household UUID"
-                value={newHouseholdId}
-                onChange={(e) => setNewHouseholdId(e.target.value)}
-                className="font-mono text-sm"
-              />
+              <Label htmlFor="householdId">Your Household</Label>
+              <div className="p-3 rounded-xl bg-muted/50 border border-border">
+                <p className="font-medium text-foreground text-sm">
+                  {household?.name || "No household"}
+                </p>
+                <p className="text-xs text-muted-foreground font-mono mt-1">
+                  {userHouseholdId || "Not available"}
+                </p>
+              </div>
               <p className="text-xs text-muted-foreground">
-                This links the device to your kitchen inventory
+                Your device will be linked to this household automatically
               </p>
             </div>
 
             <motion.button
               type="submit"
-              disabled={saving || !deviceSerial.trim() || !newHouseholdId.trim()}
+              disabled={saving || !validateSerial(deviceSerial) || !userHouseholdId}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
@@ -121,7 +186,7 @@ const VigilSetup = () => {
               {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
+                  Connecting...
                 </>
               ) : (
                 "Connect Device"
@@ -136,7 +201,7 @@ const VigilSetup = () => {
           <ul className="text-sm text-muted-foreground space-y-2">
             <li className="flex items-start gap-2">
               <span className="text-primary">1.</span>
-              Your Raspberry Pi scans barcodes and inserts items into the database
+              Your Vigil device scans barcodes and syncs items to the cloud
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary">2.</span>
@@ -144,7 +209,7 @@ const VigilSetup = () => {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary">3.</span>
-              All items are filtered by your household ID
+              All items are automatically linked to your household
             </li>
           </ul>
         </GlassCard>
