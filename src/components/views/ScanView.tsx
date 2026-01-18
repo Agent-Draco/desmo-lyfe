@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import Quagga from "@ericblade/quagga2";
+import jsQR from "jsqr";
 
 interface ScanViewProps {
   onAddItem: (item: { name: string; barcode?: string; category?: string }) => Promise<any>;
@@ -22,15 +22,32 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     category?: string;
   } | null>(null);
 
-  const { videoRef, lookupBarcode, startScanning, stopScanning, isScanning } =
-    useBarcodeScanner();
-  const scannerRef = useRef<HTMLDivElement>(null);
+  const { videoRef, lookupBarcode, startScanning, stopScanning } = useBarcodeScanner();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scanIntervalRef = useRef<number | null>(null);
+  const lastScannedRef = useRef<string | null>(null);
+  const scanCountRef = useRef<Map<string, number>>(new Map());
 
   const handleBarcodeDetected = useCallback(
     async (barcode: string) => {
+      // Prevent duplicate scans
+      if (lastScannedRef.current === barcode) return;
+      
+      // Require multiple consistent reads for accuracy
+      const count = (scanCountRef.current.get(barcode) || 0) + 1;
+      scanCountRef.current.set(barcode, count);
+      
+      // Only accept after 3 consistent reads
+      if (count < 3) return;
+      
+      lastScannedRef.current = barcode;
       setLoading(true);
       stopScanning();
-      Quagga.stop();
+      
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
 
       const product = await lookupBarcode(barcode);
 
@@ -51,61 +68,59 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     [lookupBarcode, stopScanning]
   );
 
-  const startQuaggaScanner = useCallback(async () => {
-    if (!scannerRef.current) return;
+  const scanFrame = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return;
 
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // jsQR is primarily for QR codes, but we use it for better accuracy
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert",
+    });
+
+    if (code && code.data) {
+      handleBarcodeDetected(code.data);
+    }
+  }, [videoRef, handleBarcodeDetected]);
+
+  const startJsQRScanner = useCallback(async () => {
     try {
-      await Quagga.init(
-        {
-          inputStream: {
-            type: "LiveStream",
-            target: scannerRef.current,
-            constraints: {
-              facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-          },
-          decoder: {
-            readers: [
-              "ean_reader",
-              "ean_8_reader",
-              "upc_reader",
-              "upc_e_reader",
-              "code_128_reader",
-            ],
-          },
-          locate: true,
-        },
-        (err) => {
-          if (err) {
-            console.error("Quagga init error:", err);
-            return;
-          }
-          Quagga.start();
-        }
-      );
-
-      Quagga.onDetected((result) => {
-        if (result.codeResult.code) {
-          handleBarcodeDetected(result.codeResult.code);
-        }
-      });
+      await startScanning();
+      
+      // Reset scan tracking
+      lastScannedRef.current = null;
+      scanCountRef.current.clear();
+      
+      // Start scanning loop
+      scanIntervalRef.current = window.setInterval(scanFrame, 100);
     } catch (error) {
       console.error("Scanner error:", error);
     }
-  }, [handleBarcodeDetected]);
+  }, [startScanning, scanFrame]);
 
   useEffect(() => {
-    if (mode === "scan") {
-      startQuaggaScanner();
+    if (mode === "scan" && !scannedProduct) {
+      startJsQRScanner();
     }
 
     return () => {
-      Quagga.stop();
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
       stopScanning();
     };
-  }, [mode, startQuaggaScanner, stopScanning]);
+  }, [mode, scannedProduct, startJsQRScanner, stopScanning]);
 
   const handleAddScannedProduct = async () => {
     if (!scannedProduct) return;
@@ -118,6 +133,8 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     });
     setScannedProduct(null);
     setMode("choice");
+    lastScannedRef.current = null;
+    scanCountRef.current.clear();
     setLoading(false);
   };
 
@@ -136,9 +153,22 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     setLoading(false);
   };
 
+  const handleCloseScanner = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    stopScanning();
+    lastScannedRef.current = null;
+    scanCountRef.current.clear();
+    setMode("choice");
+  };
 
   return (
     <section className="flex flex-col items-center justify-center min-h-[60vh]">
+      {/* Hidden canvas for image processing */}
+      <canvas ref={canvasRef} className="hidden" />
+      
       <AnimatePresence mode="wait">
         {mode === "choice" && (
           <motion.div
@@ -182,7 +212,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
                   <p className="text-sm text-muted-foreground">Add item details by hand</p>
                 </div>
               </GlassCard>
-
             </div>
           </motion.div>
         )}
@@ -196,34 +225,35 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
             className="w-full max-w-sm mx-auto"
           >
             <div className="relative">
-              <div
-                ref={scannerRef}
-                className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black"
-              >
+              <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black">
                 <video
                   ref={videoRef}
                   className="w-full h-full object-cover"
                   playsInline
                   muted
+                  autoPlay
                 />
               </div>
 
               {/* Scan overlay */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-3/4 h-1/3 border-2 border-primary rounded-lg">
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                <div className="w-3/4 h-1/3 border-2 border-primary rounded-lg relative">
+                  <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                  <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                  <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                  <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
                 </div>
               </div>
 
+              {/* Loading indicator */}
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              )}
+
               <button
-                onClick={() => {
-                  Quagga.stop();
-                  stopScanning();
-                  setMode("choice");
-                }}
+                onClick={handleCloseScanner}
                 className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white"
               >
                 <X className="w-6 h-6" />
@@ -231,7 +261,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
             </div>
 
             <p className="text-center text-muted-foreground mt-4">
-              Point camera at barcode
+              Point camera at barcode or QR code
             </p>
           </motion.div>
         )}
@@ -262,7 +292,11 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setScannedProduct(null)}
+                  onClick={() => {
+                    setScannedProduct(null);
+                    lastScannedRef.current = null;
+                    scanCountRef.current.clear();
+                  }}
                   className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
                 >
                   Cancel

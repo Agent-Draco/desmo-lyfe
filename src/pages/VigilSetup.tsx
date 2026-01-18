@@ -20,9 +20,9 @@ const VigilSetup = () => {
   // Auto-fill household ID from user's household
   const userHouseholdId = household?.id || "";
 
-  // Validate device serial format: VGL-XXX (3 alphanumeric characters after VGL-)
+  // Validate device serial format: VGL-XXX (3 numeric digits after VGL-)
   const validateSerial = (serial: string): boolean => {
-    const pattern = /^VGL-[A-Z0-9]{3}$/;
+    const pattern = /^VGL-[0-9]{3}$/;
     return pattern.test(serial);
   };
 
@@ -35,6 +35,11 @@ const VigilSetup = () => {
       formatted = "VGL-" + formatted.replace("VGL-", "").replace("VGL", "");
     }
     
+    // Only allow numbers after VGL-
+    const prefix = "VGL-";
+    const suffix = formatted.slice(4).replace(/[^0-9]/g, "");
+    formatted = prefix + suffix;
+    
     // Limit to VGL-XXX format (7 chars total)
     if (formatted.length > 7) {
       formatted = formatted.slice(0, 7);
@@ -42,6 +47,10 @@ const VigilSetup = () => {
     
     setDeviceSerial(formatted);
     setSerialError("");
+  };
+
+  const handleBack = () => {
+    navigate("/");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,7 +94,7 @@ const VigilSetup = () => {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="mb-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -157,7 +166,7 @@ const VigilSetup = () => {
                 <p className="text-sm text-destructive">{serialError}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Enter the 3-character code from your Vigil device (e.g., VGL-A1B)
+                Enter the 3-digit code from your Vigil device (e.g., VGL-001)
               </p>
             </div>
 
