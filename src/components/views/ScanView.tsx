@@ -16,6 +16,9 @@ interface ScanViewProps {
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [mode, setMode] = useState<"choice" | "scan" | "manual">("choice");
   const [manualName, setManualName] = useState("");
+  const [manualMfgDate, setManualMfgDate] = useState("");
+  const [manualBatchNumber, setManualBatchNumber] = useState("");
+  const [manualExpiryDate, setManualExpiryDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<{
     name: string;
@@ -210,14 +213,19 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualName.trim()) return;
+    if (!manualName.trim() || !manualMfgDate.trim() || !manualExpiryDate.trim()) return;
 
     setLoading(true);
     await onAddItem({
       name: manualName.trim(),
+      mfg: manualMfgDate.trim(),
+      batch: manualBatchNumber.trim() || "-",
+      exp: manualExpiryDate.trim(),
     });
     setManualName("");
-    setManualCategory("");
+    setManualMfgDate("");
+    setManualBatchNumber("");
+    setManualExpiryDate("");
     setMode("choice");
     setLoading(false);
   };
@@ -405,7 +413,36 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="mfg">Manufacturing Date</Label>
+                  <Input
+                    id="mfg"
+                    type="date"
+                    value={manualMfgDate}
+                    onChange={(e) => setManualMfgDate(e.target.value)}
+                  />
+                </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="batch">Batch Number (Optional)</Label>
+                  <Input
+                    id="batch"
+                    type="text"
+                    placeholder="e.g., LOT123"
+                    value={manualBatchNumber}
+                    onChange={(e) => setManualBatchNumber(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="exp">Expiry Date</Label>
+                  <Input
+                    id="exp"
+                    type="date"
+                    value={manualExpiryDate}
+                    onChange={(e) => setManualExpiryDate(e.target.value)}
+                  />
+                </div>
 
                 <div className="flex gap-2 pt-2">
                   <button
@@ -419,7 +456,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
                     type="submit"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    disabled={loading || !manualName.trim()}
+                    disabled={loading || !manualName.trim() || !manualMfgDate.trim() || !manualExpiryDate.trim()}
                     className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
                   >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Add Item"}

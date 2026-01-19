@@ -100,6 +100,8 @@ export const useInventory = (householdId: string | null) => {
     category?: string;
     barcode?: string;
     expiry_date?: string;
+    manufacturing_date?: string;
+    batch_number?: string;
   }) => {
     if (!householdId) return null;
 
@@ -117,6 +119,8 @@ export const useInventory = (householdId: string | null) => {
           category: item.category,
           barcode: item.barcode,
           expiry_date: item.expiry_date,
+          manufacturing_date: item.manufacturing_date,
+          batch_number: item.batch_number,
           added_by: user.id,
         })
         .select()

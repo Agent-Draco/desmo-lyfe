@@ -82,8 +82,32 @@ export const useBarcodeScanner = () => {
     return null;
   };
 
+  const checkPermissions = useCallback(async () => {
+    try {
+      // Check if permissions API is available
+      if (navigator.permissions) {
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        setHasPermission(permissionStatus.state === 'granted');
+
+        // Listen for permission changes
+        permissionStatus.addEventListener('change', () => {
+          setHasPermission(permissionStatus.state === 'granted');
+        });
+      } else {
+        // Fallback for browsers without permissions API
+        setHasPermission(null);
+      }
+    } catch (error) {
+      console.error("Permission check error:", error);
+      setHasPermission(null);
+    }
+  }, []);
+
   const startScanning = useCallback(async () => {
     try {
+      // First check permissions
+      await checkPermissions();
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
@@ -100,13 +124,23 @@ export const useBarcodeScanner = () => {
     } catch (error: any) {
       console.error("Camera access error:", error);
       setHasPermission(false);
+
+      let errorMessage = "Please allow camera access to scan barcodes";
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Camera access was denied. Please enable camera permissions in your browser settings.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No camera found on this device.";
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = "Camera is already in use by another application.";
+      }
+
       toast({
-        title: "Camera access denied",
-        description: "Please allow camera access to scan barcodes",
+        title: "Camera access failed",
+        description: errorMessage,
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, checkPermissions]);
 
   const stopScanning = useCallback(() => {
     if (streamRef.current) {

@@ -1,18 +1,19 @@
-# TODO: Remove Category Feature from Inventory Items
+# TODO: Implement All App Features
 
 ## Steps to Complete
 
-- [x] Remove FOOD_CATEGORIES and getCategoryForProduct from src/integrations/vigil/client.ts
-- [x] Update types in src/integrations/supabase/types.ts to remove category
-- [x] Update src/hooks/useInventory.ts to remove category from addItem functions and logic
-- [x] Update src/hooks/useKitchenInventory.ts to remove category from addItem functions and logic
-- [x] Update src/hooks/useVigilInventory.ts to remove category from addItem functions and logic
-- [x] Update src/components/InventoryItem.tsx to remove category-related code (icons, etc.)
-- [x] Update src/components/views/InventoryView.tsx to remove category-related code (grouping, etc.)
-- [x] Update src/components/QuickAddPreset.tsx to remove category-related code (presets, etc.)
-- [x] Update src/components/views/HomeView.tsx to remove category props and usage
-- [x] Update src/components/views/ScanView.tsx to remove category props and usage
-- [x] Update src/pages/Index.tsx to remove category props and usage
+- [x] **Manual Entry Enhancement:** Add mfg date, batch number (optional, default "-"), expiry date fields to ScanView manual mode
+- [x] **Quick Add Automation:** Update quick add to automatically calculate mfg/exp dates based on current date and market standards, set batch to "-"
+- [x] **Shopping List Feature:** Create new shopping list view, hook, and UI; integrate deletion when items added to inventory
+- [x] **Camera Permissions Fix:** Update useBarcodeScanner to properly handle permissions
+- [x] **Device Registration Display:** Show registered devices in VigilSetup page
+- [x] **Settings Buttons:** Make profile, notifications, appearance, privacy buttons functional
+- [ ] **Themes System:** Implement multiple light/dark themes changeable from settings
+- [ ] **Pop-up Reminders:** Add overlay notifications for expiring items with shopping list option
+- [ ] **Expiry Disposal:** Keep expired items for 3 days before disposal
 
 ## Followup Steps
-- [x] Test the app to ensure no category references remain and functionality works
+- [ ] Test all features thoroughly
+- [ ] Ensure no placeholders, use real data
+- [ ] Implement user permissions for pop-ups
+- [ ] Verify camera permissions work correctly

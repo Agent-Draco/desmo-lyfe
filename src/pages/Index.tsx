@@ -7,12 +7,14 @@ import { RemovalModeToggle } from "@/components/RemovalModeToggle";
 import { SuccessFlash } from "@/components/SuccessFlash";
 import { HomeView } from "@/components/views/HomeView";
 import { InventoryView } from "@/components/views/InventoryView";
+import { ShoppingListView } from "@/components/views/ShoppingListView";
 import { ScanView } from "@/components/views/ScanView";
 import { FamilyView } from "@/components/views/FamilyView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useInventory } from "@/hooks/useInventory";
+import { useShoppingList } from "@/hooks/useShoppingList";
 import { useExpiryNotifications } from "@/hooks/useExpiryNotifications";
 import { quickAddPresets } from "@/components/QuickAddPreset";
 import { Loader2 } from "lucide-react";
@@ -52,15 +54,74 @@ const Index = () => {
 
   const handleQuickAdd = async (name: string) => {
     const preset = quickAddPresets.find(p => p.name === name);
-    await addItem({ name, category: preset?.category });
+
+    // Calculate manufacturing and expiry dates based on market standards
+    const today = new Date();
+    const manufacturingDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    let expiryDate: string;
+    const nameLower = name.toLowerCase();
+
+    // Market standard expiry calculations
+    if (nameLower.includes('milk') || nameLower.includes('cheese') || nameLower.includes('yogurt') || nameLower.includes('butter')) {
+      // Dairy: 7-14 days
+      const expiry = new Date(today);
+      expiry.setDate(today.getDate() + 10); // Average 10 days
+      expiryDate = expiry.toISOString().split('T')[0];
+    } else if (nameLower.includes('chicken') || nameLower.includes('salmon') || nameLower.includes('meat')) {
+      // Meat: 3-5 days
+      const expiry = new Date(today);
+      expiry.setDate(today.getDate() + 4); // Average 4 days
+      expiryDate = expiry.toISOString().split('T')[0];
+    } else if (nameLower.includes('bread')) {
+      // Bakery: 3-5 days
+      const expiry = new Date(today);
+      expiry.setDate(today.getDate() + 4); // Average 4 days
+      expiryDate = expiry.toISOString().split('T')[0];
+    } else if (nameLower.includes('rice') || nameLower.includes('grains')) {
+      // Grains: 1-2 years
+      const expiry = new Date(today);
+      expiry.setFullYear(today.getFullYear() + 1); // 1 year
+      expiryDate = expiry.toISOString().split('T')[0];
+    } else if (nameLower.includes('juice') || nameLower.includes('beverages')) {
+      // Beverages: 7-14 days
+      const expiry = new Date(today);
+      expiry.setDate(today.getDate() + 10); // Average 10 days
+      expiryDate = expiry.toISOString().split('T')[0];
+    } else {
+      // Default for fruits/vegetables: 7-14 days
+      const expiry = new Date(today);
+      expiry.setDate(today.getDate() + 10); // Average 10 days
+      expiryDate = expiry.toISOString().split('T')[0];
+    }
+
+    await addItem({
+      name,
+      category: preset?.category,
+      manufacturing_date: manufacturingDate,
+      expiry_date: expiryDate,
+      batch_number: "-"
+    });
   };
 
   const handleAddItem = async (item: { name: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => {
-    return await addItem({
+    const result = await addItem({
       name: item.name,
       barcode: item.barcode,
       expiry_date: item.exp,
+      manufacturing_date: item.mfg,
+      batch_number: item.batch,
     });
+
+    // Remove from shopping list if item was successfully added to inventory
+    if (result) {
+      const shoppingItem = shoppingList.find(s => s.item_name.toLowerCase() === item.name.toLowerCase());
+      if (shoppingItem) {
+        await deleteShoppingItem(shoppingItem.id);
+      }
+    }
+
+    return result;
   };
 
   // Combined notification count
@@ -93,6 +154,15 @@ const Index = () => {
             inventory={inventory}
             onItemClick={handleItemClick}
             loading={inventoryLoading}
+          />
+        );
+      case "shopping":
+        return (
+          <ShoppingListView
+            shoppingList={shoppingList}
+            onAddItem={addShoppingItem}
+            onDeleteItem={deleteShoppingItem}
+            loading={shoppingListLoading}
           />
         );
       case "scan":

@@ -6,19 +6,53 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useVigilSettings } from "@/hooks/useVigilSettings";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Loader2, Wifi, Check, AlertCircle } from "lucide-react";
+import { vigilSupabase } from "@/integrations/vigil/client";
+import { ArrowLeft, Loader2, Wifi, Check, AlertCircle, Monitor } from "lucide-react";
 import desmoLogo from "@/assets/desmo-logo.png";
+
+interface RegisteredDevice {
+  device_serial: string;
+  household_id: string;
+  created_at: string;
+}
 
 const VigilSetup = () => {
   const [deviceSerial, setDeviceSerial] = useState("VGL-");
   const [saving, setSaving] = useState(false);
   const [serialError, setSerialError] = useState("");
+  const [registeredDevices, setRegisteredDevices] = useState<RegisteredDevice[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
   const navigate = useNavigate();
   const { householdId, saveSettings } = useVigilSettings();
   const { household, loading: authLoading } = useAuth();
 
   // Auto-fill household ID from user's household
   const userHouseholdId = household?.id || "";
+
+  // Fetch registered devices for this household
+  useEffect(() => {
+    const fetchRegisteredDevices = async () => {
+      if (!userHouseholdId) return;
+
+      setLoadingDevices(true);
+      try {
+        const { data, error } = await vigilSupabase
+          .from("vigil_settings")
+          .select("device_serial, household_id, created_at")
+          .eq("household_id", userHouseholdId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        setRegisteredDevices(data || []);
+      } catch (error) {
+        console.error("Error fetching registered devices:", error);
+      } finally {
+        setLoadingDevices(false);
+      }
+    };
+
+    fetchRegisteredDevices();
+  }, [userHouseholdId]);
 
   // Validate device serial format: VGL-XXX (3 numeric digits after VGL-)
   const validateSerial = (serial: string): boolean => {
@@ -203,6 +237,53 @@ const VigilSetup = () => {
             </motion.button>
           </form>
         </GlassCard>
+
+        {/* Registered Devices */}
+        {userHouseholdId && (
+          <GlassCard className="mt-6 p-4" delay={0.15}>
+            <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
+              <Monitor className="w-4 h-4" />
+              Registered Devices
+            </h3>
+
+            {loadingDevices ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              </div>
+            ) : registeredDevices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No devices registered yet. Connect your first Vigil device above.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {registeredDevices.map((device, index) => (
+                  <motion.div
+                    key={device.device_serial}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Monitor className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground text-sm">
+                          {device.device_serial}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Connected {new Date(device.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <Check className="w-4 h-4 text-success" />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </GlassCard>
+        )}
 
         {/* Info Card */}
         <GlassCard className="mt-6 p-4" delay={0.2}>
