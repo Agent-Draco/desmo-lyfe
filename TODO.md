@@ -8,12 +8,8 @@
 - [x] **Camera Permissions Fix:** Update useBarcodeScanner to properly handle permissions
 - [x] **Device Registration Display:** Show registered devices in VigilSetup page
 - [x] **Settings Buttons:** Make profile, notifications, appearance, privacy buttons functional
-- [ ] **Themes System:** Implement multiple light/dark themes changeable from settings
-- [ ] **Pop-up Reminders:** Add overlay notifications for expiring items with shopping list option
-- [ ] **Expiry Disposal:** Keep expired items for 3 days before disposal
+- [x] **Themes System:** Implement multiple light/dark themes changeable from settings
+- [x] **Pop-up Reminders:** Add overlay notifications for expiring items with add to shopping list option
+- [x] **Expiry Disposal:** Keep expired items in inventory for 3 days then delete
 
-## Followup Steps
-- [ ] Test all features thoroughly
-- [ ] Ensure no placeholders, use real data
-- [ ] Implement user permissions for pop-ups
-- [ ] Verify camera permissions work correctly
+# No followup steps

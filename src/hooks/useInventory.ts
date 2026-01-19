@@ -54,6 +54,35 @@ export const useInventory = (householdId: string | null) => {
     fetchItems();
   }, [fetchItems]);
 
+  // Cleanup expired items after 3 days
+  useEffect(() => {
+    const cleanupExpiredItems = async () => {
+      if (!householdId || items.length === 0) return;
+
+      const now = new Date();
+      const expiredItems = items.filter(item => {
+        if (!item.expiry_date) return false;
+        const expiryDate = new Date(item.expiry_date);
+        const daysExpired = Math.floor((now.getTime() - expiryDate.getTime()) / (1000 * 60 * 60 * 24));
+        return daysExpired > 3; // Keep for 3 days before disposal
+      });
+
+      if (expiredItems.length > 0) {
+        for (const item of expiredItems) {
+          await deleteItem(item.id);
+        }
+      }
+    };
+
+    // Run cleanup every hour
+    const cleanupInterval = setInterval(cleanupExpiredItems, 60 * 60 * 1000);
+
+    // Also run once on mount
+    cleanupExpiredItems();
+
+    return () => clearInterval(cleanupInterval);
+  }, [householdId, items, deleteItem]);
+
   // Real-time subscription
   useEffect(() => {
     if (!householdId) return;

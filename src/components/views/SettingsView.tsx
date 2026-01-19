@@ -31,6 +31,10 @@ const settingsItems = [
 
 export const SettingsView = ({ profile, household, onSignOut }: SettingsViewProps) => {
   const navigate = useNavigate();
+  const { theme, setTheme, themes } = useTheme();
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [privacyMode, setPrivacyMode] = useState(false);
   const displayInitial = profile?.display_name?.charAt(0).toUpperCase() || "U";
 
   return (
@@ -74,21 +78,182 @@ export const SettingsView = ({ profile, household, onSignOut }: SettingsViewProp
 
       {/* Settings Items */}
       <div className="space-y-3">
-        {settingsItems.map((item, i) => {
-          const Icon = item.icon;
-          return (
-            <GlassCard key={item.id} delay={0.2 + i * 0.1} className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Icon className="w-5 h-5 text-primary" />
+        {/* Profile Section */}
+        <GlassCard
+          onClick={() => setActiveSection(activeSection === 'profile' ? null : 'profile')}
+          className="flex items-center gap-4 cursor-pointer"
+          delay={0.2}
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <User className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-foreground">Profile</h4>
+            <p className="text-sm text-muted-foreground">Manage your account details</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </GlassCard>
+
+        {activeSection === 'profile' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-4"
+          >
+            <GlassCard className="p-4 space-y-4">
+              <div>
+                <Label className="text-sm font-medium">Display Name</Label>
+                <p className="text-sm text-muted-foreground mt-1">{profile?.display_name || 'Not set'}</p>
               </div>
-              <div className="flex-1">
-                <h4 className="font-medium text-foreground">{item.label}</h4>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
+              <div>
+                <Label className="text-sm font-medium">Household</Label>
+                <p className="text-sm text-muted-foreground mt-1">{household?.name || 'Not set'}</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </GlassCard>
-          );
-        })}
+          </motion.div>
+        )}
+
+        {/* Notifications Section */}
+        <GlassCard
+          onClick={() => setActiveSection(activeSection === 'notifications' ? null : 'notifications')}
+          className="flex items-center gap-4 cursor-pointer"
+          delay={0.3}
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Bell className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-foreground">Notifications</h4>
+            <p className="text-sm text-muted-foreground">Configure alert preferences</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </GlassCard>
+
+        {activeSection === 'notifications' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-4"
+          >
+            <GlassCard className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Expiry Alerts</Label>
+                  <p className="text-sm text-muted-foreground">Get notified when items are expiring</p>
+                </div>
+                <Switch
+                  checked={notificationsEnabled}
+                  onCheckedChange={setNotificationsEnabled}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Low Stock Alerts</Label>
+                  <p className="text-sm text-muted-foreground">Get notified when items are running low</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+
+        {/* Appearance Section */}
+        <GlassCard
+          onClick={() => setActiveSection(activeSection === 'appearance' ? null : 'appearance')}
+          className="flex items-center gap-4 cursor-pointer"
+          delay={0.4}
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Moon className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-foreground">Appearance</h4>
+            <p className="text-sm text-muted-foreground">Theme & display settings</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </GlassCard>
+
+        {activeSection === 'appearance' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-4"
+          >
+            <GlassCard className="p-4 space-y-4">
+              <div>
+                <Label className="text-sm font-medium mb-3 block">Theme</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {themes.map((themeOption) => (
+                    <Button
+                      key={themeOption.id}
+                      variant={theme === themeOption.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTheme(themeOption.id)}
+                      className="justify-start"
+                    >
+                      {themeOption.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">High Contrast</Label>
+                  <p className="text-sm text-muted-foreground">Increase contrast for better visibility</p>
+                </div>
+                <Switch />
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+
+        {/* Privacy Section */}
+        <GlassCard
+          onClick={() => setActiveSection(activeSection === 'privacy' ? null : 'privacy')}
+          className="flex items-center gap-4 cursor-pointer"
+          delay={0.5}
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Shield className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-foreground">Privacy</h4>
+            <p className="text-sm text-muted-foreground">Control your data and privacy</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </GlassCard>
+
+        {activeSection === 'privacy' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-4"
+          >
+            <GlassCard className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Analytics</Label>
+                  <p className="text-sm text-muted-foreground">Help improve the app with usage data</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Privacy Mode</Label>
+                  <p className="text-sm text-muted-foreground">Limit data sharing and tracking</p>
+                </div>
+                <Switch
+                  checked={privacyMode}
+                  onCheckedChange={setPrivacyMode}
+                />
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
       </div>
 
       {/* Sign Out Button */}

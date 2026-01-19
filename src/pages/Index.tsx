@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { GlassNav } from "@/components/GlassNav";
 import { RemovalModeToggle } from "@/components/RemovalModeToggle";
 import { SuccessFlash } from "@/components/SuccessFlash";
+import { PopUpReminder } from "@/components/PopUpReminder";
 import { HomeView } from "@/components/views/HomeView";
 import { InventoryView } from "@/components/views/InventoryView";
 import { ShoppingListView } from "@/components/views/ShoppingListView";
@@ -23,11 +24,14 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("home");
   const [removalMode, setRemovalMode] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
+  const [expiringItems, setExpiringItems] = useState([]);
   const navigate = useNavigate();
 
   const { user, profile, household, loading: authLoading, signOut, hasHousehold } = useAuth();
   const { items: inventory, loading: inventoryLoading, addItem, deleteItem } = useInventory(household?.id || null);
-  
+  const { items: shoppingList, loading: shoppingListLoading, addItem: addShoppingItem, deleteItem: deleteShoppingItem } = useShoppingList(household?.id || null);
+
   // Enable expiry notifications
   const { expiringCount, expiredCount } = useExpiryNotifications(inventory, {
     warningDays: 3,
@@ -41,6 +45,24 @@ const Index = () => {
       navigate("/onboarding");
     }
   }, [authLoading, user, hasHousehold, navigate]);
+
+  // Check for expiring items and show reminder
+  useEffect(() => {
+    if (inventory.length > 0) {
+      const now = new Date();
+      const expiringSoon = inventory.filter(item => {
+        if (!item.expiry_date) return false;
+        const expiryDate = new Date(item.expiry_date);
+        const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return daysUntilExpiry <= 3 && daysUntilExpiry > 0;
+      });
+
+      if (expiringSoon.length > 0 && !showReminder) {
+        setExpiringItems(expiringSoon);
+        setShowReminder(true);
+      }
+    }
+  }, [inventory, showReminder]);
 
   const handleItemClick = async (id: string) => {
     if (removalMode) {
@@ -210,6 +232,17 @@ const Index = () => {
       )}
       
       <GlassNav activeTab={activeTab} onTabChange={setActiveTab} />
+
+      <PopUpReminder
+        isVisible={showReminder}
+        expiringItems={expiringItems}
+        onDismiss={() => setShowReminder(false)}
+        onAddToShoppingList={async (itemName) => {
+          // Add to shopping list
+          await addShoppingItem({ item_name: itemName, quantity: 1 });
+          setShowReminder(false);
+        }}
+      />
     </div>
   );
 };
