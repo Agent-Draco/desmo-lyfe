@@ -12,7 +12,7 @@ import { FamilyView } from "@/components/views/FamilyView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useInventory } from "@/hooks/useInventory";
+import { useKitchenInventory } from "@/hooks/useKitchenInventory";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -22,7 +22,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   const { user, profile, household, loading: authLoading, signOut, hasHousehold } = useAuth();
-  const { items: inventory, loading: inventoryLoading, addItem, decrementItem } = useInventory(household?.id || null);
+  const { items: inventory, loading: inventoryLoading, addItem, deleteItem } = useKitchenInventory(household?.id || null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,7 +34,7 @@ const Index = () => {
 
   const handleItemClick = async (id: string) => {
     if (removalMode) {
-      const success = await decrementItem(id);
+      const success = await deleteItem(id);
       if (success) {
         setShowFlash(true);
         setTimeout(() => setShowFlash(false), 300);

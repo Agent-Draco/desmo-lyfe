@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import jsQR from "jsqr";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 interface ScanViewProps {
   onAddItem: (item: { name: string; barcode?: string; category?: string }) => Promise<any>;
@@ -27,6 +29,10 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const scanIntervalRef = useRef<number | null>(null);
   const lastScannedRef = useRef<string | null>(null);
   const scanCountRef = useRef<Map<string, number>>(new Map());
+
+  const barcodeDetectorRef = useRef<any | null>(null);
+  const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const isDecodingRef = useRef(false);
 
   const handleBarcodeDetected = useCallback(
     async (barcode: string) => {
@@ -68,8 +74,9 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     [lookupBarcode, stopScanning]
   );
 
-  const scanFrame = useCallback(() => {
+  const scanFrame = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
+    if (isDecodingRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -77,32 +84,99 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
 
     if (!ctx || video.readyState !== video.HAVE_ENOUGH_DATA) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    isDecodingRef.current = true;
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    // jsQR is primarily for QR codes, but we use it for better accuracy
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "dontInvert",
-    });
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    if (code && code.data) {
-      handleBarcodeDetected(code.data);
+      // 1) Native BarcodeDetector (best when available)
+      const BarcodeDetectorCtor = (window as any).BarcodeDetector;
+      if (BarcodeDetectorCtor) {
+        if (!barcodeDetectorRef.current) {
+          barcodeDetectorRef.current = new BarcodeDetectorCtor({
+            formats: [
+              "qr_code",
+              "ean_13",
+              "ean_8",
+              "upc_a",
+              "upc_e",
+              "code_128",
+              "code_39",
+              "code_93",
+              "itf",
+              "data_matrix",
+              "pdf417",
+              "aztec",
+            ],
+          });
+        }
+
+        const detections = await barcodeDetectorRef.current.detect(canvas);
+        const raw = detections?.[0]?.rawValue;
+        if (raw) {
+          await handleBarcodeDetected(String(raw));
+          return;
+        }
+      }
+
+      // 2) ZXing fallback (supports 1D + 2D)
+      if (!zxingReaderRef.current) {
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.CODE_39,
+          BarcodeFormat.CODE_93,
+          BarcodeFormat.ITF,
+          BarcodeFormat.QR_CODE,
+          BarcodeFormat.DATA_MATRIX,
+          BarcodeFormat.PDF_417,
+          BarcodeFormat.AZTEC,
+        ]);
+        zxingReaderRef.current = new BrowserMultiFormatReader(hints);
+      }
+
+      try {
+        const result = await zxingReaderRef.current.decodeFromCanvas(canvas);
+        const text = result?.getText?.();
+        if (text) {
+          await handleBarcodeDetected(text);
+          return;
+        }
+      } catch {
+        // ignore not-found frames
+      }
+
+      // 3) jsQR fallback (QR-only, but very reliable for QR)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const qr = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+      if (qr?.data) {
+        await handleBarcodeDetected(qr.data);
+      }
+    } finally {
+      isDecodingRef.current = false;
     }
   }, [videoRef, handleBarcodeDetected]);
 
   const startJsQRScanner = useCallback(async () => {
     try {
       await startScanning();
-      
+
       // Reset scan tracking
       lastScannedRef.current = null;
       scanCountRef.current.clear();
-      
+
       // Start scanning loop
-      scanIntervalRef.current = window.setInterval(scanFrame, 100);
+      scanIntervalRef.current = window.setInterval(() => {
+        void scanFrame();
+      }, 200);
     } catch (error) {
       console.error("Scanner error:", error);
     }

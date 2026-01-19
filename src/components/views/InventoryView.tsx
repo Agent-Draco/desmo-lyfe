@@ -3,7 +3,7 @@ import { InventoryItem } from "@/components/InventoryItem";
 import { Grid, List, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
+import type { KitchenInventoryItem as InventoryItemType } from "@/hooks/useKitchenInventory";
 
 interface InventoryViewProps {
   inventory: InventoryItemType[];
