@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Package, AlertTriangle, Clock, TrendingUp, Loader2 } from "lucide-react";
+import { Package, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
@@ -9,7 +9,7 @@ import type { KitchenInventoryItem as InventoryItemType } from "@/hooks/useKitch
 interface HomeViewProps {
   inventory: InventoryItemType[];
   onItemClick: (id: string) => void;
-  onQuickAdd: (name: string) => void;
+  onQuickAdd: (name: string, category: string) => void;
   loading?: boolean;
 }
 
@@ -19,10 +19,11 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
     const days = Math.ceil(
       (new Date(item.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
-    return days <= 2 && days > 0;
+    return days <= 3 && days > 0;
   }).length;
 
   const inStockCount = inventory.filter(item => !item.is_out).length;
+  const outOfStockCount = inventory.filter(item => item.is_out).length;
 
   return (
     <>
@@ -60,9 +61,10 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
             delay={0.2}
           />
           <StatsCard
-            title="Last Scan"
-            value="30m"
-            icon={Clock}
+            title="Out of Stock"
+            value={outOfStockCount}
+            icon={Package}
+            variant={outOfStockCount > 0 ? "warning" : "default"}
             delay={0.3}
           />
         </div>
@@ -85,7 +87,8 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
               key={preset.name}
               name={preset.name}
               emoji={preset.emoji}
-              onClick={() => onQuickAdd(preset.name)}
+              category={preset.category}
+              onClick={() => onQuickAdd(preset.name, preset.category)}
               delay={0.3 + i * 0.05}
             />
           ))}
@@ -115,14 +118,15 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
         ) : (
           <div className="space-y-3">
             <AnimatePresence>
-              {inventory.slice(0, 3).map((item, i) => (
+              {inventory.slice(0, 5).map((item, i) => (
                 <InventoryItem
                   key={item.id}
                   name={item.name}
                   quantity={item.quantity}
+                  category={item.category}
                   expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
-                  addedBy={item.profile?.display_name || undefined}
-                  addedAt={new Date(item.created_at)}
+                  mfgDate={item.mfg_date ? new Date(item.mfg_date) : undefined}
+                  batch={item.batch}
                   isInStock={!item.is_out}
                   onClick={() => onItemClick(item.id)}
                   delay={0.5 + i * 0.1}
