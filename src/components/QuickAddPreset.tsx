@@ -4,14 +4,11 @@ import { FOOD_CATEGORIES } from "@/integrations/vigil/client";
 interface QuickAddPresetProps {
   name: string;
   emoji: string;
-  category: string;
   onClick: () => void;
   delay?: number;
 }
 
-export const QuickAddPreset = ({ name, emoji, category, onClick, delay = 0 }: QuickAddPresetProps) => {
-  const categoryInfo = FOOD_CATEGORIES[category] || FOOD_CATEGORIES.other;
-  
+export const QuickAddPreset = ({ name, emoji, onClick, delay = 0 }: QuickAddPresetProps) => {
   return (
     <motion.button
       initial={{ opacity: 0, scale: 0.8 }}
@@ -24,7 +21,6 @@ export const QuickAddPreset = ({ name, emoji, category, onClick, delay = 0 }: Qu
     >
       <span className="text-2xl">{emoji}</span>
       <span className="text-xs font-medium text-foreground">{name}</span>
-      <span className="text-[10px] text-muted-foreground">{categoryInfo.defaultExpiryDays}d shelf</span>
     </motion.button>
   );
 };
@@ -32,20 +28,19 @@ export const QuickAddPreset = ({ name, emoji, category, onClick, delay = 0 }: Qu
 export interface QuickAddPresetData {
   name: string;
   emoji: string;
-  category: string;
 }
 
 export const quickAddPresets: QuickAddPresetData[] = [
-  { name: "Milk", emoji: "🥛", category: "dairy" },
-  { name: "Eggs", emoji: "🥚", category: "eggs" },
-  { name: "Bread", emoji: "🍞", category: "bread" },
-  { name: "Butter", emoji: "🧈", category: "dairy" },
-  { name: "Cheese", emoji: "🧀", category: "dairy" },
-  { name: "Chicken", emoji: "🍗", category: "poultry" },
-  { name: "Apples", emoji: "🍎", category: "fruits" },
-  { name: "Bananas", emoji: "🍌", category: "fruits" },
-  { name: "Salmon", emoji: "🐟", category: "seafood" },
-  { name: "Rice", emoji: "🍚", category: "grains" },
-  { name: "Yogurt", emoji: "🥄", category: "dairy" },
-  { name: "Orange Juice", emoji: "🍊", category: "beverages" },
+  { name: "Milk", emoji: "🥛" },
+  { name: "Eggs", emoji: "🥚" },
+  { name: "Bread", emoji: "🍞" },
+  { name: "Butter", emoji: "🧈" },
+  { name: "Cheese", emoji: "🧀" },
+  { name: "Chicken", emoji: "🍗" },
+  { name: "Apples", emoji: "🍎" },
+  { name: "Bananas", emoji: "🍌" },
+  { name: "Salmon", emoji: "🐟" },
+  { name: "Rice", emoji: "🍚" },
+  { name: "Yogurt", emoji: "🥄" },
+  { name: "Orange Juice", emoji: "🍊" },
 ];

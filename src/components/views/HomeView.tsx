@@ -9,7 +9,7 @@ import type { KitchenInventoryItem as InventoryItemType } from "@/hooks/useKitch
 interface HomeViewProps {
   inventory: InventoryItemType[];
   onItemClick: (id: string) => void;
-  onQuickAdd: (name: string, category: string) => void;
+  onQuickAdd: (name: string) => void;
   loading?: boolean;
 }
 
@@ -87,8 +87,7 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
               key={preset.name}
               name={preset.name}
               emoji={preset.emoji}
-              category={preset.category}
-              onClick={() => onQuickAdd(preset.name, preset.category)}
+              onClick={() => onQuickAdd(preset.name)}
               delay={0.3 + i * 0.05}
             />
           ))}
@@ -123,7 +122,6 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
                   key={item.id}
                   name={item.name}
                   quantity={item.quantity}
-                  category={item.category}
                   expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
                   mfgDate={item.mfg_date ? new Date(item.mfg_date) : undefined}
                   batch={item.batch}

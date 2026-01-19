@@ -10,18 +10,16 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 interface ScanViewProps {
-  onAddItem: (item: { name: string; barcode?: string; category?: string; exp?: string; mfg?: string; batch?: string }) => Promise<any>;
+  onAddItem: (item: { name: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => Promise<any>;
 }
 
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [mode, setMode] = useState<"choice" | "scan" | "manual">("choice");
   const [manualName, setManualName] = useState("");
-  const [manualCategory, setManualCategory] = useState("");
   const [loading, setLoading] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<{
     name: string;
     barcode: string;
-    category?: string;
   } | null>(null);
 
   const { videoRef, lookupBarcode, startScanning, stopScanning } = useBarcodeScanner();
@@ -61,7 +59,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
         setScannedProduct({
           name: product.name,
           barcode,
-          category: product.category,
         });
       } else {
         setScannedProduct({
@@ -203,7 +200,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     await onAddItem({
       name: scannedProduct.name,
       barcode: scannedProduct.barcode,
-      category: scannedProduct.category,
     });
     setScannedProduct(null);
     setMode("choice");
@@ -219,7 +215,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     setLoading(true);
     await onAddItem({
       name: manualName.trim(),
-      category: manualCategory.trim() || undefined,
     });
     setManualName("");
     setManualCategory("");
@@ -358,11 +353,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
               <p className="text-sm text-muted-foreground mb-4">
                 Barcode: {scannedProduct.barcode}
               </p>
-              {scannedProduct.category && (
-                <p className="text-sm text-muted-foreground mb-4">
-                  Category: {scannedProduct.category}
-                </p>
-              )}
 
               <div className="flex gap-2">
                 <button
@@ -415,16 +405,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category (optional)</Label>
-                  <Input
-                    id="category"
-                    type="text"
-                    placeholder="e.g., Dairy"
-                    value={manualCategory}
-                    onChange={(e) => setManualCategory(e.target.value)}
-                  />
-                </div>
+
 
                 <div className="flex gap-2 pt-2">
                   <button

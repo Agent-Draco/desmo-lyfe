@@ -49,11 +49,11 @@ const Index = () => {
     }
   };
 
-  const handleQuickAdd = async (name: string, category: string) => {
-    await addItem({ name, category });
+  const handleQuickAdd = async (name: string) => {
+    await addItem({ name });
   };
 
-  const handleAddItem = async (item: { name: string; barcode?: string; category?: string; exp?: string; mfg?: string; batch?: string }) => {
+  const handleAddItem = async (item: { name: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => {
     return await addItem(item);
   };
 

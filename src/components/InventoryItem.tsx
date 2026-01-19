@@ -5,12 +5,11 @@ import {
   Package, Clock, Milk, Egg, Croissant, Beef, Drumstick, Apple, Carrot, 
   Snowflake, Wine, Cookie, Droplet, Wheat, Fish, Calendar, Hash
 } from "lucide-react";
-import { FOOD_CATEGORIES } from "@/integrations/vigil/client";
+
 
 interface InventoryItemProps {
   name: string;
   quantity: number;
-  category?: string | null;
   expiryDate?: Date;
   mfgDate?: Date;
   batch?: string | null;
@@ -19,29 +18,11 @@ interface InventoryItemProps {
   delay?: number;
 }
 
-const getCategoryIcon = (category: string | null | undefined) => {
-  switch (category) {
-    case "dairy": return Milk;
-    case "eggs": return Egg;
-    case "bread": return Croissant;
-    case "meat": return Beef;
-    case "poultry": return Drumstick;
-    case "fruits": return Apple;
-    case "vegetables": return Carrot;
-    case "frozen": return Snowflake;
-    case "beverages": return Wine;
-    case "snacks": return Cookie;
-    case "condiments": return Droplet;
-    case "grains": return Wheat;
-    case "seafood": return Fish;
-    default: return Package;
-  }
-};
+
 
 export const InventoryItem = ({
   name,
   quantity,
-  category,
   expiryDate,
   mfgDate,
   batch,
@@ -50,15 +31,14 @@ export const InventoryItem = ({
   delay = 0,
 }: InventoryItemProps) => {
   const now = new Date();
-  const daysUntilExpiry = expiryDate 
+  const daysUntilExpiry = expiryDate
     ? Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     : null;
-  
+
   const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 3 && daysUntilExpiry > 0;
   const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
 
-  const CategoryIcon = getCategoryIcon(category);
-  const categoryInfo = category ? FOOD_CATEGORIES[category] : FOOD_CATEGORIES.other;
+  const CategoryIcon = Package;
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -89,7 +69,7 @@ export const InventoryItem = ({
       <div className="flex-1 min-w-0">
         {/* Header Row */}
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-lg">{categoryInfo?.emoji || "📦"}</span>
+          <span className="text-lg">📦</span>
           <h3 className="font-semibold text-foreground truncate">{name}</h3>
           <span className={cn(
             "px-2 py-0.5 rounded-full text-xs font-medium shrink-0",

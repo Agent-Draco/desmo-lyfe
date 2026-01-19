@@ -98,19 +98,15 @@ export const useVigilInventory = (householdId: string | null) => {
     }
   };
 
-  const addItem = async (item: { name: string; category?: string; exp?: string; mfg?: string; batch?: string }) => {
+  const addItem = async (item: { name: string; exp?: string; mfg?: string; batch?: string }) => {
     if (!householdId) return null;
 
     try {
-      // Auto-detect category if not provided
-      const category = item.category || getCategoryForProduct(item.name);
-      
-      // Calculate default expiry date if not provided
+      // Calculate default expiry date if not provided (30 days)
       let expDate = item.exp;
       if (!expDate) {
-        const categoryInfo = FOOD_CATEGORIES[category] || FOOD_CATEGORIES.other;
         const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + categoryInfo.defaultExpiryDays);
+        expiryDate.setDate(expiryDate.getDate() + 30);
         expDate = expiryDate.toISOString().split("T")[0];
       }
 
@@ -120,7 +116,6 @@ export const useVigilInventory = (householdId: string | null) => {
           household_id: householdId,
           name: item.name,
           status: "in",
-          category,
           exp: expDate,
           mfg: item.mfg || null,
           batch: item.batch || null,

@@ -39,7 +39,6 @@ export type Database = {
         Row: {
           added_by: string | null
           barcode: string | null
-          category: string | null
           created_at: string
           expiry_date: string | null
           household_id: string
@@ -53,7 +52,6 @@ export type Database = {
         Insert: {
           added_by?: string | null
           barcode?: string | null
-          category?: string | null
           created_at?: string
           expiry_date?: string | null
           household_id: string
@@ -67,7 +65,6 @@ export type Database = {
         Update: {
           added_by?: string | null
           barcode?: string | null
-          category?: string | null
           created_at?: string
           expiry_date?: string | null
           household_id?: string
