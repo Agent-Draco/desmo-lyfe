@@ -4,7 +4,7 @@ import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
 import { AnimatePresence } from "framer-motion";
-import type { KitchenInventoryItem as InventoryItemType } from "@/hooks/useKitchenInventory";
+import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
 
 interface HomeViewProps {
   inventory: InventoryItemType[];
@@ -123,8 +123,6 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
                   name={item.name}
                   quantity={item.quantity}
                   expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
-                  mfgDate={item.mfg_date ? new Date(item.mfg_date) : undefined}
-                  batch={item.batch}
                   isInStock={!item.is_out}
                   onClick={() => onItemClick(item.id)}
                   delay={0.5 + i * 0.1}

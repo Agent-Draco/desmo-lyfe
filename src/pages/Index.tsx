@@ -12,8 +12,9 @@ import { FamilyView } from "@/components/views/FamilyView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useKitchenInventory } from "@/hooks/useKitchenInventory";
+import { useInventory } from "@/hooks/useInventory";
 import { useExpiryNotifications } from "@/hooks/useExpiryNotifications";
+import { quickAddPresets } from "@/components/QuickAddPreset";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -23,7 +24,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   const { user, profile, household, loading: authLoading, signOut, hasHousehold } = useAuth();
-  const { items: inventory, loading: inventoryLoading, addItem, deleteItem } = useKitchenInventory(household?.id || null);
+  const { items: inventory, loading: inventoryLoading, addItem, deleteItem } = useInventory(household?.id || null);
   
   // Enable expiry notifications
   const { expiringCount, expiredCount } = useExpiryNotifications(inventory, {
@@ -50,11 +51,16 @@ const Index = () => {
   };
 
   const handleQuickAdd = async (name: string) => {
-    await addItem({ name });
+    const preset = quickAddPresets.find(p => p.name === name);
+    await addItem({ name, category: preset?.category });
   };
 
   const handleAddItem = async (item: { name: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => {
-    return await addItem(item);
+    return await addItem({
+      name: item.name,
+      barcode: item.barcode,
+      expiry_date: item.exp,
+    });
   };
 
   // Combined notification count

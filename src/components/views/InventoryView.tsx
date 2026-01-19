@@ -4,7 +4,7 @@ import { Grid, List, Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 
-import type { KitchenInventoryItem as InventoryItemType } from "@/hooks/useKitchenInventory";
+import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
 
 interface InventoryViewProps {
   inventory: InventoryItemType[];
@@ -68,15 +68,12 @@ export const InventoryView = ({ inventory, onItemClick, loading }: InventoryView
             : "space-y-3"
         )}>
           <AnimatePresence>
-            {filteredItems.map((item, i) => (
+            {inventory.map((item, i) => (
               <InventoryItem
                 key={item.id}
                 name={item.name}
                 quantity={item.quantity}
-                category={item.category}
                 expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
-                mfgDate={item.mfg_date ? new Date(item.mfg_date) : undefined}
-                batch={item.batch}
                 isInStock={!item.is_out}
                 onClick={() => onItemClick(item.id)}
                 delay={i * 0.05}

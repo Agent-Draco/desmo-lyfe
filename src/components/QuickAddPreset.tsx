@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { FOOD_CATEGORIES } from "@/integrations/vigil/client";
 
 interface QuickAddPresetProps {
   name: string;
@@ -28,19 +27,20 @@ export const QuickAddPreset = ({ name, emoji, onClick, delay = 0 }: QuickAddPres
 export interface QuickAddPresetData {
   name: string;
   emoji: string;
+  category: string;
 }
 
 export const quickAddPresets: QuickAddPresetData[] = [
-  { name: "Milk", emoji: "🥛" },
-  { name: "Eggs", emoji: "🥚" },
-  { name: "Bread", emoji: "🍞" },
-  { name: "Butter", emoji: "🧈" },
-  { name: "Cheese", emoji: "🧀" },
-  { name: "Chicken", emoji: "🍗" },
-  { name: "Apples", emoji: "🍎" },
-  { name: "Bananas", emoji: "🍌" },
-  { name: "Salmon", emoji: "🐟" },
-  { name: "Rice", emoji: "🍚" },
-  { name: "Yogurt", emoji: "🥄" },
-  { name: "Orange Juice", emoji: "🍊" },
+  { name: "Milk", emoji: "🥛", category: "Dairy" },
+  { name: "Eggs", emoji: "🥚", category: "Protein" },
+  { name: "Bread", emoji: "🍞", category: "Bakery" },
+  { name: "Butter", emoji: "🧈", category: "Dairy" },
+  { name: "Cheese", emoji: "🧀", category: "Dairy" },
+  { name: "Chicken", emoji: "🍗", category: "Meat" },
+  { name: "Apples", emoji: "🍎", category: "Fruits" },
+  { name: "Bananas", emoji: "🍌", category: "Fruits" },
+  { name: "Salmon", emoji: "🐟", category: "Seafood" },
+  { name: "Rice", emoji: "🍚", category: "Grains" },
+  { name: "Yogurt", emoji: "🥄", category: "Dairy" },
+  { name: "Orange Juice", emoji: "🍊", category: "Beverages" },
 ];
