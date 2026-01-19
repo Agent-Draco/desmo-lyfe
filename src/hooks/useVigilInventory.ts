@@ -98,10 +98,66 @@ export const useVigilInventory = (householdId: string | null) => {
     }
   };
 
+  const addItem = async (item: { name: string }) => {
+    if (!householdId) return null;
+
+    try {
+      const { data, error } = await vigilSupabase
+        .from("inventory")
+        .insert({
+          household_id: householdId,
+          name: item.name,
+          status: "in",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Item added",
+        description: `${item.name} added to inventory`,
+      });
+
+      return data as VigilInventoryItem;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  const deleteItem = async (id: string) => {
+    try {
+      const { error } = await vigilSupabase.from("inventory").delete().eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Item removed",
+        description: "Item deleted from inventory",
+      });
+
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   return {
     items,
     loading,
     refetch: fetchItems,
+    addItem,
+    deleteItem,
     updateItemStatus,
   };
 };

@@ -4,7 +4,7 @@ import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
 import { AnimatePresence } from "framer-motion";
-import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
+import type { KitchenInventoryItem as InventoryItemType } from "@/hooks/useKitchenInventory";
 
 interface HomeViewProps {
   inventory: InventoryItemType[];
