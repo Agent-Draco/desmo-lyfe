@@ -9,6 +9,8 @@ export interface KitchenInventoryItem {
   category: string | null;
   barcode: string | null;
   expiry_date: string | null;
+  mfg_date: string | null;
+  batch: string | null;
   is_out: boolean;
   added_by: string | null;
   created_at: string;
@@ -42,9 +44,11 @@ export const useKitchenInventory = (householdId: string | null) => {
         name: it.name,
         quantity: 1,
         unit: null,
-        category: null,
+        category: it.category ?? null,
         barcode: null,
         expiry_date: it.exp ?? null,
+        mfg_date: it.mfg ?? null,
+        batch: it.batch ?? null,
         is_out: it.status === "out",
         added_by: null,
         created_at: createdAt,
@@ -55,9 +59,14 @@ export const useKitchenInventory = (householdId: string | null) => {
     });
   }, [vigilItems]);
 
-  const addItem = async (item: { name: string; category?: string; barcode?: string }) => {
-    // category/barcode not supported by Vigil schema (yet)
-    return await vigilAddItem({ name: item.name });
+  const addItem = async (item: { name: string; category?: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => {
+    return await vigilAddItem({ 
+      name: item.name, 
+      category: item.category,
+      exp: item.exp,
+      mfg: item.mfg,
+      batch: item.batch,
+    });
   };
 
   const deleteItem = async (id: string) => {

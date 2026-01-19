@@ -13,6 +13,7 @@ import { SettingsView } from "@/components/views/SettingsView";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useKitchenInventory } from "@/hooks/useKitchenInventory";
+import { useExpiryNotifications } from "@/hooks/useExpiryNotifications";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -23,6 +24,12 @@ const Index = () => {
 
   const { user, profile, household, loading: authLoading, signOut, hasHousehold } = useAuth();
   const { items: inventory, loading: inventoryLoading, addItem, deleteItem } = useKitchenInventory(household?.id || null);
+  
+  // Enable expiry notifications
+  const { expiringCount, expiredCount } = useExpiryNotifications(inventory, {
+    warningDays: 3,
+    checkInterval: 300000, // Check every 5 minutes
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -42,21 +49,16 @@ const Index = () => {
     }
   };
 
-  const handleQuickAdd = async (name: string) => {
-    await addItem({ name });
+  const handleQuickAdd = async (name: string, category: string) => {
+    await addItem({ name, category });
   };
 
-  const handleAddItem = async (item: { name: string; barcode?: string; category?: string }) => {
+  const handleAddItem = async (item: { name: string; barcode?: string; category?: string; exp?: string; mfg?: string; batch?: string }) => {
     return await addItem(item);
   };
 
-  const expiringCount = inventory.filter((item) => {
-    if (!item.expiry_date) return false;
-    const days = Math.ceil(
-      (new Date(item.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
-    return days <= 2 && days > 0;
-  }).length;
+  // Combined notification count
+  const notificationCount = expiringCount + expiredCount;
 
   if (authLoading) {
     return (
@@ -107,7 +109,7 @@ const Index = () => {
       <Header 
         userName={profile?.display_name || "User"} 
         householdName={household?.name || "Kitchen"}
-        notificationCount={expiringCount}
+        notificationCount={notificationCount}
       />
       
       <main className="pt-24 pb-44 px-4 max-w-4xl mx-auto">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { vigilSupabase, VigilInventoryItem } from "@/integrations/vigil/client";
+import { vigilSupabase, VigilInventoryItem, getCategoryForProduct, FOOD_CATEGORIES } from "@/integrations/vigil/client";
 import { useToast } from "@/hooks/use-toast";
 
 export const useVigilInventory = (householdId: string | null) => {
@@ -98,16 +98,32 @@ export const useVigilInventory = (householdId: string | null) => {
     }
   };
 
-  const addItem = async (item: { name: string }) => {
+  const addItem = async (item: { name: string; category?: string; exp?: string; mfg?: string; batch?: string }) => {
     if (!householdId) return null;
 
     try {
+      // Auto-detect category if not provided
+      const category = item.category || getCategoryForProduct(item.name);
+      
+      // Calculate default expiry date if not provided
+      let expDate = item.exp;
+      if (!expDate) {
+        const categoryInfo = FOOD_CATEGORIES[category] || FOOD_CATEGORIES.other;
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + categoryInfo.defaultExpiryDays);
+        expDate = expiryDate.toISOString().split("T")[0];
+      }
+
       const { data, error } = await vigilSupabase
         .from("inventory")
         .insert({
           household_id: householdId,
           name: item.name,
           status: "in",
+          category,
+          exp: expDate,
+          mfg: item.mfg || null,
+          batch: item.batch || null,
         })
         .select()
         .single();

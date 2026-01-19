@@ -1,25 +1,50 @@
 import { motion } from "framer-motion";
 import { GlassCard } from "./GlassCard";
 import { cn } from "@/lib/utils";
-import { Package, Clock, User } from "lucide-react";
+import { 
+  Package, Clock, Milk, Egg, Croissant, Beef, Drumstick, Apple, Carrot, 
+  Snowflake, Wine, Cookie, Droplet, Wheat, Fish, Calendar, Hash
+} from "lucide-react";
+import { FOOD_CATEGORIES } from "@/integrations/vigil/client";
 
 interface InventoryItemProps {
   name: string;
   quantity: number;
+  category?: string | null;
   expiryDate?: Date;
-  addedBy?: string;
-  addedAt?: Date;
+  mfgDate?: Date;
+  batch?: string | null;
   isInStock?: boolean;
   onClick?: () => void;
   delay?: number;
 }
 
+const getCategoryIcon = (category: string | null | undefined) => {
+  switch (category) {
+    case "dairy": return Milk;
+    case "eggs": return Egg;
+    case "bread": return Croissant;
+    case "meat": return Beef;
+    case "poultry": return Drumstick;
+    case "fruits": return Apple;
+    case "vegetables": return Carrot;
+    case "frozen": return Snowflake;
+    case "beverages": return Wine;
+    case "snacks": return Cookie;
+    case "condiments": return Droplet;
+    case "grains": return Wheat;
+    case "seafood": return Fish;
+    default: return Package;
+  }
+};
+
 export const InventoryItem = ({
   name,
   quantity,
+  category,
   expiryDate,
-  addedBy,
-  addedAt,
+  mfgDate,
+  batch,
   isInStock = true,
   onClick,
   delay = 0,
@@ -29,18 +54,14 @@ export const InventoryItem = ({
     ? Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     : null;
   
-  const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 2 && daysUntilExpiry > 0;
+  const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 3 && daysUntilExpiry > 0;
   const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
 
-  const getTimeSince = (date: Date) => {
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (seconds < 60) return "Just now";
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+  const CategoryIcon = getCategoryIcon(category);
+  const categoryInfo = category ? FOOD_CATEGORIES[category] : FOOD_CATEGORIES.other;
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
   return (
@@ -48,27 +69,30 @@ export const InventoryItem = ({
       isExpiring={isExpiringSoon} 
       onClick={onClick}
       delay={delay}
-      className="flex items-center gap-4"
+      className="flex items-start gap-4"
     >
+      {/* Category Icon */}
       <div className={cn(
-        "w-12 h-12 rounded-xl flex items-center justify-center",
-        isInStock ? "bg-success/10" : "bg-muted",
+        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
+        isInStock ? "bg-primary/10" : "bg-muted",
         isExpiringSoon && "bg-warning/20",
         isExpired && "bg-destructive/10"
       )}>
-        <Package className={cn(
+        <CategoryIcon className={cn(
           "w-6 h-6",
-          isInStock ? "text-success" : "text-muted-foreground",
+          isInStock ? "text-primary" : "text-muted-foreground",
           isExpiringSoon && "text-warning",
           isExpired && "text-destructive"
         )} />
       </div>
       
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        {/* Header Row */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-lg">{categoryInfo?.emoji || "📦"}</span>
           <h3 className="font-semibold text-foreground truncate">{name}</h3>
           <span className={cn(
-            "px-2 py-0.5 rounded-full text-xs font-medium",
+            "px-2 py-0.5 rounded-full text-xs font-medium shrink-0",
             isInStock 
               ? "bg-success/10 text-success" 
               : "bg-muted text-muted-foreground"
@@ -77,35 +101,50 @@ export const InventoryItem = ({
           </span>
         </div>
         
-        <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-          <span className="font-medium">{quantity}x</span>
+        {/* Details Grid */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          {/* Quantity */}
+          <div className="flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5" />
+            <span>{quantity}x</span>
+          </div>
           
+          {/* Expiry Date */}
           {expiryDate && (
-            <span className={cn(
-              "flex items-center gap-1",
+            <div className={cn(
+              "flex items-center gap-1.5",
               isExpiringSoon && "text-warning font-medium",
               isExpired && "text-destructive font-medium"
             )}>
               <Clock className="w-3.5 h-3.5" />
-              {isExpired 
-                ? "Expired" 
-                : isExpiringSoon 
-                  ? `${daysUntilExpiry}d left` 
-                  : `${daysUntilExpiry}d`
-              }
-            </span>
+              <span>
+                {isExpired 
+                  ? "Expired" 
+                  : isExpiringSoon 
+                    ? `${daysUntilExpiry}d left` 
+                    : formatDate(expiryDate)
+                }
+              </span>
+            </div>
+          )}
+          
+          {/* Manufacturing Date */}
+          {mfgDate && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Mfg: {formatDate(mfgDate)}</span>
+            </div>
+          )}
+          
+          {/* Batch Number */}
+          {batch && (
+            <div className="flex items-center gap-1.5">
+              <Hash className="w-3.5 h-3.5" />
+              <span className="truncate">Batch: {batch}</span>
+            </div>
           )}
         </div>
       </div>
-      
-      {addedBy && addedAt && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="w-3.5 h-3.5 text-primary" />
-          </div>
-          <span>{getTimeSince(addedAt)}</span>
-        </div>
-      )}
     </GlassCard>
   );
 };
