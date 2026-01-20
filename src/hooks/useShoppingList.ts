@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { vigilSupabase } from "@/integrations/vigil/client";
 import { useToast } from "@/hooks/use-toast";
 
 export interface ShoppingListItem {
@@ -12,7 +12,7 @@ export interface ShoppingListItem {
 }
 
 /**
- * Shopping list hook - uses the regular Supabase project's shopping_list table
+ * Shopping list hook - uses the Vigil Supabase project's shopping_list table
  */
 export const useShoppingList = (householdId: string | null) => {
   const [items, setItems] = useState<ShoppingListItem[]>([]);
@@ -27,7 +27,7 @@ export const useShoppingList = (householdId: string | null) => {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await vigilSupabase
         .from("shopping_list")
         .select("*")
         .eq("household_id", householdId)
@@ -50,7 +50,7 @@ export const useShoppingList = (householdId: string | null) => {
   useEffect(() => {
     if (!householdId) return;
 
-    const channel = supabase
+    const channel = vigilSupabase
       .channel("shopping-list-changes")
       .on(
         "postgres_changes",
@@ -81,7 +81,7 @@ export const useShoppingList = (householdId: string | null) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      vigilSupabase.removeChannel(channel);
     };
   }, [householdId]);
 
@@ -89,7 +89,7 @@ export const useShoppingList = (householdId: string | null) => {
     if (!householdId) return null;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await vigilSupabase
         .from("shopping_list")
         .insert({
           household_id: householdId,
@@ -119,7 +119,7 @@ export const useShoppingList = (householdId: string | null) => {
 
   const deleteItem = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await vigilSupabase
         .from("shopping_list")
         .delete()
         .eq("id", id);
@@ -144,7 +144,7 @@ export const useShoppingList = (householdId: string | null) => {
 
   const updateItem = async (id: string, updates: Partial<ShoppingListItem>) => {
     try {
-      const { error } = await supabase
+      const { error } = await vigilSupabase
         .from("shopping_list")
         .update(updates)
         .eq("id", id);
