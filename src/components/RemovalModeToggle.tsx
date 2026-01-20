@@ -13,7 +13,7 @@ export const RemovalModeToggle = ({ isActive, onToggle }: RemovalModeToggleProps
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }}
-      className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40"
+      className="fixed bottom-32 right-4 z-40"
     >
       <motion.button
         onClick={onToggle}

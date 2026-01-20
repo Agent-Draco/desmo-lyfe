@@ -46,23 +46,33 @@ const Index = () => {
     }
   }, [authLoading, user, hasHousehold, navigate]);
 
-  // Check for expiring items and show reminder
+  // Check for expiring items and show reminder on initial load
   useEffect(() => {
     if (inventory.length > 0) {
       const now = new Date();
       const expiringSoon = inventory.filter(item => {
-        if (!item.expiry_date) return false;
+        if (!item.expiry_date || item.is_out) return false;
         const expiryDate = new Date(item.expiry_date);
         const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        return daysUntilExpiry <= 3 && daysUntilExpiry > 0;
+        return daysUntilExpiry <= 3 && daysUntilExpiry >= 0;
+      }).map(item => {
+        const expiryDate = new Date(item.expiry_date!);
+        const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          id: item.id,
+          name: item.name,
+          expiry_date: item.expiry_date!,
+          daysUntilExpiry
+        };
       });
 
       if (expiringSoon.length > 0 && !showReminder) {
         setExpiringItems(expiringSoon);
-        setShowReminder(true);
+        // Small delay to let the page load first
+        setTimeout(() => setShowReminder(true), 1000);
       }
     }
-  }, [inventory, showReminder]);
+  }, [inventory]);
 
   const handleItemClick = async (id: string) => {
     if (removalMode) {
@@ -167,6 +177,9 @@ const Index = () => {
             inventory={inventory}
             onItemClick={handleItemClick}
             onQuickAdd={handleQuickAdd}
+            shoppingList={shoppingList}
+            onViewShoppingList={() => setActiveTab("shopping")}
+            shoppingListLoading={shoppingListLoading}
             loading={inventoryLoading}
           />
         );

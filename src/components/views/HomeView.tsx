@@ -3,17 +3,30 @@ import { Package, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
+import { ShoppingListWidget } from "@/components/ShoppingListWidget";
 import { AnimatePresence } from "framer-motion";
 import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
+import type { ShoppingListItem } from "@/hooks/useShoppingList";
 
 interface HomeViewProps {
   inventory: InventoryItemType[];
   onItemClick: (id: string) => void;
   onQuickAdd: (name: string) => void;
+  shoppingList?: ShoppingListItem[];
+  onViewShoppingList?: () => void;
+  shoppingListLoading?: boolean;
   loading?: boolean;
 }
 
-export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeViewProps) => {
+export const HomeView = ({ 
+  inventory, 
+  onItemClick, 
+  onQuickAdd, 
+  shoppingList = [],
+  onViewShoppingList,
+  shoppingListLoading,
+  loading 
+}: HomeViewProps) => {
   const expiringCount = inventory.filter((item) => {
     if (!item.expiry_date) return false;
     const days = Math.ceil(
@@ -93,6 +106,15 @@ export const HomeView = ({ inventory, onItemClick, onQuickAdd, loading }: HomeVi
           ))}
         </div>
       </section>
+
+      {/* Shopping List Widget */}
+      {onViewShoppingList && (
+        <ShoppingListWidget
+          items={shoppingList}
+          onViewAll={onViewShoppingList}
+          loading={shoppingListLoading}
+        />
+      )}
 
       {/* Recent Items */}
       <section>
