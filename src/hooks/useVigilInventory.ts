@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { vigilSupabase, VigilInventoryItem, getCategoryForProduct, FOOD_CATEGORIES } from "@/integrations/vigil/client";
+import { vigilSupabase, VigilInventoryItem } from "@/integrations/vigil/client";
 import { useToast } from "@/hooks/use-toast";
 
 export const useVigilInventory = (householdId: string | null) => {
