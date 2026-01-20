@@ -32,4 +32,15 @@ export interface VigilInventoryItem {
   updated_at?: string;
 }
 
+export interface NudgeHistoryItem {
+  id?: string;
+  household_id: string;
+  item_name: string;
+  nudge_type: string;
+  message: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 

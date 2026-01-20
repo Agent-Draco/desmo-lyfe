@@ -47,6 +47,7 @@ export type Database = {
           is_out: boolean
           name: string
           quantity: number
+          state: string | null
           unit: string | null
           updated_at: string
         }
@@ -61,6 +62,7 @@ export type Database = {
           is_out?: boolean
           name: string
           quantity?: number
+          state?: string | null
           unit?: string | null
           updated_at?: string
         }
@@ -75,6 +77,7 @@ export type Database = {
           is_out?: boolean
           name?: string
           quantity?: number
+          state?: string | null
           unit?: string | null
           updated_at?: string
         }

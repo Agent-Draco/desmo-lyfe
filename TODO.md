@@ -1,15 +1,7 @@
-# TODO: Implement All App Features
-
-## Steps to Complete
-
-- [x] **Manual Entry Enhancement:** Add mfg date, batch number (optional, default "-"), expiry date fields to ScanView manual mode
-- [x] **Quick Add Automation:** Update quick add to automatically calculate mfg/exp dates based on current date and market standards, set batch to "-"
-- [x] **Shopping List Feature:** Create new shopping list view, hook, and UI; integrate deletion when items added to inventory
-- [x] **Camera Permissions Fix:** Update useBarcodeScanner to properly handle permissions
-- [x] **Device Registration Display:** Show registered devices in VigilSetup page
-- [x] **Settings Buttons:** Make profile, notifications, appearance, privacy buttons functional
-- [x] **Themes System:** Implement multiple light/dark themes changeable from settings
-- [x] **Pop-up Reminders:** Add overlay notifications for expiring items with add to shopping list option
-- [x] **Expiry Disposal:** Keep expired items in inventory for 3 days then delete
-
-# No followup steps
+- [x] Update Supabase Types (src/integrations/supabase/types.ts): Add state field to inventory_items
+- [x] Update Vigil Types (src/integrations/vigil/client.ts): Add nudge_history table
+- [x] Update Inventory Hook (src/hooks/useInventory.ts): Add category and state to interface, update fetch, add openItem function
+- [x] Update InventoryItem Component (src/components/InventoryItem.tsx): Replace status badges with state badges, add Open button
+- [x] Create NudgeFeed Component (src/components/NudgeFeed.tsx): Fetch and display active nudges
+- [x] Update InventoryView (src/components/views/InventoryView.tsx): Group by category, add category-specific displays
+- [x] Update HomeView (src/components/views/HomeView.tsx): Integrate NudgeFeed as Active Nudges

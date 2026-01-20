@@ -14,7 +14,10 @@ interface InventoryItemProps {
   mfgDate?: Date;
   batch?: string | null;
   isInStock?: boolean;
+  state?: string | null;
+  category?: string | null;
   onClick?: () => void;
+  onOpen?: () => void;
   delay?: number;
 }
 
@@ -27,7 +30,10 @@ export const InventoryItem = ({
   mfgDate,
   batch,
   isInStock = true,
+  state,
+  category,
   onClick,
+  onOpen,
   delay = 0,
 }: InventoryItemProps) => {
   const now = new Date();
@@ -71,14 +77,34 @@ export const InventoryItem = ({
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">📦</span>
           <h3 className="font-semibold text-foreground truncate">{name}</h3>
-          <span className={cn(
-            "px-2 py-0.5 rounded-full text-xs font-medium shrink-0",
-            isInStock 
-              ? "bg-success/10 text-success" 
-              : "bg-muted text-muted-foreground"
-          )}>
-            {isInStock ? "In Stock" : "Out"}
-          </span>
+          {state === 'new' && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium shrink-0 bg-blue-100 text-blue-800">
+              Unopened
+            </span>
+          )}
+          {state === 'opened' && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium shrink-0 bg-orange-100 text-orange-800">
+              Consuming
+            </span>
+          )}
+          {state === 'critical' && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium shrink-0 bg-red-100 text-red-800 animate-pulse">
+              Action Required
+            </span>
+          )}
+          {state === 'new' && onOpen && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+              }}
+              className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+            >
+              Open
+            </motion.button>
+          )}
         </div>
         
         {/* Details Grid */}

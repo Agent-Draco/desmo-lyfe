@@ -12,6 +12,8 @@ export interface InventoryItem {
   mfg_date: string | null;
   batch: string | null;
   is_out: boolean;
+  category: string | null;
+  state: string | null;
   added_by: string | null;
   created_at: string;
   updated_at: string;
@@ -251,12 +253,17 @@ export const useInventory = (householdId: string | null) => {
     return updateItem(id, { quantity: item.quantity - 1 });
   };
 
+  const openItem = async (id: string) => {
+    return updateItem(id, { state: 'opened' });
+  };
+
   return {
     items,
     loading,
     addItem,
     updateItem,
     decrementItem,
+    openItem,
     deleteItem,
     refetch: fetchItems,
   };
