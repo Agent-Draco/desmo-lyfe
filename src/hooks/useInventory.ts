@@ -35,6 +35,9 @@ export const useInventory = (householdId: string | null) => {
 
       if (error) throw error;
 
+      // Optimistically remove from local state so UI updates without reload
+      setItems((prev) => prev.filter((item) => item.id !== id));
+
       toast({
         title: "Item removed",
         description: "Item deleted from inventory",
@@ -195,6 +198,11 @@ export const useInventory = (householdId: string | null) => {
         description: `${item.name} added to inventory`,
       });
 
+      // Optimistically add to local state so UI updates without reload
+      if (data) {
+        setItems((prev) => [data as InventoryItem, ...prev]);
+      }
+
       return data;
     } catch (error: any) {
       toast({
@@ -214,6 +222,13 @@ export const useInventory = (householdId: string | null) => {
         .eq("id", id);
 
       if (error) throw error;
+
+      // Optimistically update local state
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, ...updates } as InventoryItem : item
+        )
+      );
       return true;
     } catch (error: any) {
       toast({

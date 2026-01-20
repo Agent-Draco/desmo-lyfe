@@ -101,6 +101,11 @@ export const useShoppingList = (householdId: string | null) => {
 
       if (error) throw error;
 
+      // Optimistically add to local state so UI updates without reload
+      if (data) {
+        setItems((prev) => [data as ShoppingListItem, ...prev]);
+      }
+
       toast({
         title: "Added to shopping list",
         description: `${item.item_name} added`,
@@ -125,6 +130,9 @@ export const useShoppingList = (householdId: string | null) => {
         .eq("id", id);
 
       if (error) throw error;
+
+      // Optimistically remove from local state so UI updates without reload
+      setItems((prev) => prev.filter((item) => item.id !== id));
 
       toast({
         title: "Removed from shopping list",
