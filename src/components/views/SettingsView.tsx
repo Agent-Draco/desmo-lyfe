@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { User, Bell, Moon, Shield, LogOut, ChevronRight, Settings } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 
 interface Profile {
   id: string;
