@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { ReactNode } from "react";
+import { ReactNode, forwardRef } from "react";
 
 interface GlassCardProps {
   children: ReactNode;
@@ -10,15 +10,16 @@ interface GlassCardProps {
   delay?: number;
 }
 
-export const GlassCard = ({ 
+export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({ 
   children, 
   className, 
   isExpiring = false,
   onClick,
   delay = 0
-}: GlassCardProps) => {
+}, ref) => {
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
@@ -34,4 +35,6 @@ export const GlassCard = ({
       {children}
     </motion.div>
   );
-};
+});
+
+GlassCard.displayName = "GlassCard";

@@ -9,6 +9,8 @@ export interface InventoryItem {
   unit: string | null;
   barcode: string | null;
   expiry_date: string | null;
+  mfg_date: string | null;
+  batch: string | null;
   is_out: boolean;
   added_by: string | null;
   created_at: string;
@@ -23,6 +25,31 @@ export const useInventory = (householdId: string | null) => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  const deleteItem = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("inventory_items")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Item removed",
+        description: "Item deleted from inventory",
+      });
+
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [toast]);
 
   const fetchItems = useCallback(async () => {
     if (!householdId) {
@@ -42,7 +69,15 @@ export const useInventory = (householdId: string | null) => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setItems(data || []);
+      
+      // Map to include mfg_date and batch
+      const mappedItems: InventoryItem[] = (data || []).map(item => ({
+        ...item,
+        mfg_date: null,
+        batch: null,
+      }));
+      
+      setItems(mappedItems);
     } catch (error) {
       console.error("Error fetching inventory:", error);
     } finally {
@@ -148,8 +183,6 @@ export const useInventory = (householdId: string | null) => {
           category: item.category,
           barcode: item.barcode,
           expiry_date: item.expiry_date,
-          manufacturing_date: item.manufacturing_date,
-          batch_number: item.batch_number,
           added_by: user.id,
         })
         .select()
@@ -201,31 +234,6 @@ export const useInventory = (householdId: string | null) => {
     }
 
     return updateItem(id, { quantity: item.quantity - 1 });
-  };
-
-  const deleteItem = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("inventory_items")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Item removed",
-        description: "Item deleted from inventory",
-      });
-
-      return true;
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      return false;
-    }
   };
 
   return {

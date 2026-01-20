@@ -1,9 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import { vigilSupabase, VigilInventoryItem } from "@/integrations/vigil/client";
+import { vigilSupabase } from "@/integrations/vigil/client";
 import { useToast } from "@/hooks/use-toast";
 
-export const useVigilInventory = (householdId: string | null) => {
-  const [items, setItems] = useState<VigilInventoryItem[]>([]);
+export interface ShoppingListItem {
+  id: string;
+  item_name: string;
+  quantity: number;
+  household_id: string;
+  created_at: string;
+}
+
+/**
+ * Shopping list hook - uses the external Vigil Supabase project's shopping_list table
+ */
+export const useShoppingList = (householdId: string | null) => {
+  const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -16,7 +27,7 @@ export const useVigilInventory = (householdId: string | null) => {
 
     try {
       const { data, error } = await vigilSupabase
-        .from("inventory")
+        .from("shopping_list")
         .select("*")
         .eq("household_id", householdId)
         .order("created_at", { ascending: false });
@@ -24,7 +35,7 @@ export const useVigilInventory = (householdId: string | null) => {
       if (error) throw error;
       setItems(data || []);
     } catch (error: any) {
-      console.error("Error fetching Vigil inventory:", error);
+      console.error("Error fetching shopping list:", error);
     } finally {
       setLoading(false);
     }
@@ -34,23 +45,23 @@ export const useVigilInventory = (householdId: string | null) => {
     fetchItems();
   }, [fetchItems]);
 
-  // Real-time subscription for Raspberry Pi updates
+  // Real-time subscription
   useEffect(() => {
     if (!householdId) return;
 
     const channel = vigilSupabase
-      .channel("vigil-inventory-changes")
+      .channel("shopping-list-changes")
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "inventory",
+          table: "shopping_list",
           filter: `household_id=eq.${householdId}`,
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setItems((prev) => [payload.new as VigilInventoryItem, ...prev]);
+            setItems((prev) => [payload.new as ShoppingListItem, ...prev]);
           } else if (payload.eventType === "UPDATE") {
             setItems((prev) =>
               prev.map((item) =>
@@ -73,18 +84,50 @@ export const useVigilInventory = (householdId: string | null) => {
     };
   }, [householdId]);
 
-  const updateItemStatus = async (id: string, status: "in" | "opened" | "out") => {
+  const addItem = async (item: { item_name: string; quantity?: number }) => {
+    if (!householdId) return null;
+
+    try {
+      const { data, error } = await vigilSupabase
+        .from("shopping_list")
+        .insert({
+          household_id: householdId,
+          item_name: item.item_name,
+          quantity: item.quantity || 1,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Added to shopping list",
+        description: `${item.item_name} added`,
+      });
+
+      return data as ShoppingListItem;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  const deleteItem = async (id: string) => {
     try {
       const { error } = await vigilSupabase
-        .from("inventory")
-        .update({ status })
+        .from("shopping_list")
+        .delete()
         .eq("id", id);
 
       if (error) throw error;
 
       toast({
-        title: "Status updated",
-        description: `Item marked as ${status}`,
+        title: "Removed from shopping list",
+        description: "Item removed",
       });
 
       return true;
@@ -98,60 +141,14 @@ export const useVigilInventory = (householdId: string | null) => {
     }
   };
 
-  const addItem = async (item: { name: string; exp?: string; mfg?: string; batch?: string }) => {
-    if (!householdId) return null;
-
+  const updateItem = async (id: string, updates: Partial<ShoppingListItem>) => {
     try {
-      // Calculate default expiry date if not provided (30 days)
-      let expDate = item.exp;
-      if (!expDate) {
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30);
-        expDate = expiryDate.toISOString().split("T")[0];
-      }
-
-      const { data, error } = await vigilSupabase
-        .from("inventory")
-        .insert({
-          household_id: householdId,
-          name: item.name,
-          status: "in",
-          exp: expDate,
-          mfg: item.mfg || null,
-          batch: item.batch || null,
-        })
-        .select()
-        .single();
+      const { error } = await vigilSupabase
+        .from("shopping_list")
+        .update(updates)
+        .eq("id", id);
 
       if (error) throw error;
-
-      toast({
-        title: "Item added",
-        description: `${item.name} added to inventory`,
-      });
-
-      return data as VigilInventoryItem;
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      return null;
-    }
-  };
-
-  const deleteItem = async (id: string) => {
-    try {
-      const { error } = await vigilSupabase.from("inventory").delete().eq("id", id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Item removed",
-        description: "Item deleted from inventory",
-      });
-
       return true;
     } catch (error: any) {
       toast({
@@ -166,9 +163,9 @@ export const useVigilInventory = (householdId: string | null) => {
   return {
     items,
     loading,
-    refetch: fetchItems,
     addItem,
     deleteItem,
-    updateItemStatus,
+    updateItem,
+    refetch: fetchItems,
   };
 };

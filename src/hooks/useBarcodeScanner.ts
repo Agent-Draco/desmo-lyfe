@@ -84,15 +84,32 @@ export const useBarcodeScanner = () => {
 
   const checkPermissions = useCallback(async () => {
     try {
+      // Check if we're on HTTPS or localhost (required for camera)
+      const isSecure = window.location.protocol === 'https:' || 
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1';
+      
+      if (!isSecure) {
+        console.warn("Camera requires HTTPS or localhost");
+        setHasPermission(false);
+        return;
+      }
+
       // Check if permissions API is available
       if (navigator.permissions) {
-        const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
-        setHasPermission(permissionStatus.state === 'granted');
-
-        // Listen for permission changes
-        permissionStatus.addEventListener('change', () => {
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
           setHasPermission(permissionStatus.state === 'granted');
-        });
+
+          // Listen for permission changes
+          permissionStatus.addEventListener('change', () => {
+            setHasPermission(permissionStatus.state === 'granted');
+          });
+        } catch (permError) {
+          // Some browsers don't support camera permission query
+          console.log("Permission API not fully supported, will try getUserMedia directly");
+          setHasPermission(null);
+        }
       } else {
         // Fallback for browsers without permissions API
         setHasPermission(null);
@@ -105,11 +122,39 @@ export const useBarcodeScanner = () => {
 
   const startScanning = useCallback(async () => {
     try {
-      // First check permissions
-      await checkPermissions();
+      // Check if we're on HTTPS or localhost
+      const isSecure = window.location.protocol === 'https:' || 
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1';
+      
+      if (!isSecure) {
+        toast({
+          title: "Camera requires secure connection",
+          description: "Please access this page via HTTPS to use the camera.",
+          variant: "destructive",
+        });
+        setHasPermission(false);
+        return;
+      }
 
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast({
+          title: "Camera not supported",
+          description: "Your browser doesn't support camera access.",
+          variant: "destructive",
+        });
+        setHasPermission(false);
+        return;
+      }
+
+      // Request camera access
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
       });
 
       setHasPermission(true);
@@ -117,7 +162,14 @@ export const useBarcodeScanner = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        // Wait for video to be ready
+        await new Promise<void>((resolve, reject) => {
+          const video = videoRef.current!;
+          video.onloadedmetadata = () => {
+            video.play().then(resolve).catch(reject);
+          };
+          video.onerror = reject;
+        });
       }
 
       setIsScanning(true);
@@ -126,12 +178,30 @@ export const useBarcodeScanner = () => {
       setHasPermission(false);
 
       let errorMessage = "Please allow camera access to scan barcodes";
-      if (error.name === 'NotAllowedError') {
-        errorMessage = "Camera access was denied. Please enable camera permissions in your browser settings.";
-      } else if (error.name === 'NotFoundError') {
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = "Camera permission denied. Please enable camera access in your browser settings and refresh the page.";
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
         errorMessage = "No camera found on this device.";
-      } else if (error.name === 'NotReadableError') {
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
         errorMessage = "Camera is already in use by another application.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = "Camera constraints not satisfied. Trying fallback...";
+        // Try with simpler constraints
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setHasPermission(true);
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await videoRef.current.play();
+          }
+          setIsScanning(true);
+          return;
+        } catch {
+          errorMessage = "Could not access camera with any settings.";
+        }
+      } else if (error.name === 'SecurityError') {
+        errorMessage = "Camera access blocked for security reasons. Use HTTPS.";
       }
 
       toast({
@@ -140,7 +210,7 @@ export const useBarcodeScanner = () => {
         variant: "destructive",
       });
     }
-  }, [toast, checkPermissions]);
+  }, [toast]);
 
   const stopScanning = useCallback(() => {
     if (streamRef.current) {
