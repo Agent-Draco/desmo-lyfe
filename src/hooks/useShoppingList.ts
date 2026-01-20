@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { vigilSupabase } from "@/integrations/vigil/client";
 import { useToast } from "@/hooks/use-toast";
 
 export interface ShoppingListItem {
@@ -11,18 +11,14 @@ export interface ShoppingListItem {
 }
 
 /**
- * Shopping list hook - uses localStorage for persistence since there's no shopping_list table
- * in the external database. This provides a simple client-side shopping list.
+ * Shopping list hook - uses the external Vigil Supabase project's shopping_list table
  */
 export const useShoppingList = (householdId: string | null) => {
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const storageKey = `shopping_list_${householdId || "default"}`;
-
-  // Load items from localStorage
-  const loadItems = useCallback(() => {
+  const fetchItems = useCallback(async () => {
     if (!householdId) {
       setItems([]);
       setLoading(false);
@@ -30,76 +26,138 @@ export const useShoppingList = (householdId: string | null) => {
     }
 
     try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        setItems(JSON.parse(stored));
-      } else {
-        setItems([]);
-      }
-    } catch (error) {
-      console.error("Error loading shopping list:", error);
-      setItems([]);
+      const { data, error } = await vigilSupabase
+        .from("shopping_list")
+        .select("*")
+        .eq("household_id", householdId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setItems(data || []);
+    } catch (error: any) {
+      console.error("Error fetching shopping list:", error);
     } finally {
       setLoading(false);
     }
-  }, [householdId, storageKey]);
-
-  // Save items to localStorage
-  const saveItems = useCallback((newItems: ShoppingListItem[]) => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(newItems));
-    } catch (error) {
-      console.error("Error saving shopping list:", error);
-    }
-  }, [storageKey]);
+  }, [householdId]);
 
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+    fetchItems();
+  }, [fetchItems]);
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!householdId) return;
+
+    const channel = vigilSupabase
+      .channel("shopping-list-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "shopping_list",
+          filter: `household_id=eq.${householdId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setItems((prev) => [payload.new as ShoppingListItem, ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            setItems((prev) =>
+              prev.map((item) =>
+                item.id === payload.new.id
+                  ? { ...item, ...payload.new }
+                  : item
+              )
+            );
+          } else if (payload.eventType === "DELETE") {
+            setItems((prev) =>
+              prev.filter((item) => item.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      vigilSupabase.removeChannel(channel);
+    };
+  }, [householdId]);
 
   const addItem = async (item: { item_name: string; quantity?: number }) => {
     if (!householdId) return null;
 
-    const newItem: ShoppingListItem = {
-      id: crypto.randomUUID(),
-      item_name: item.item_name,
-      quantity: item.quantity || 1,
-      household_id: householdId,
-      created_at: new Date().toISOString(),
-    };
+    try {
+      const { data, error } = await vigilSupabase
+        .from("shopping_list")
+        .insert({
+          household_id: householdId,
+          item_name: item.item_name,
+          quantity: item.quantity || 1,
+        })
+        .select()
+        .single();
 
-    const newItems = [newItem, ...items];
-    setItems(newItems);
-    saveItems(newItems);
+      if (error) throw error;
 
-    toast({
-      title: "Added to shopping list",
-      description: `${item.item_name} added`,
-    });
+      toast({
+        title: "Added to shopping list",
+        description: `${item.item_name} added`,
+      });
 
-    return newItem;
+      return data as ShoppingListItem;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return null;
+    }
   };
 
   const deleteItem = async (id: string) => {
-    const newItems = items.filter((item) => item.id !== id);
-    setItems(newItems);
-    saveItems(newItems);
+    try {
+      const { error } = await vigilSupabase
+        .from("shopping_list")
+        .delete()
+        .eq("id", id);
 
-    toast({
-      title: "Removed from shopping list",
-      description: "Item removed",
-    });
+      if (error) throw error;
 
-    return true;
+      toast({
+        title: "Removed from shopping list",
+        description: "Item removed",
+      });
+
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
   };
 
   const updateItem = async (id: string, updates: Partial<ShoppingListItem>) => {
-    const newItems = items.map((item) =>
-      item.id === id ? { ...item, ...updates } : item
-    );
-    setItems(newItems);
-    saveItems(newItems);
-    return true;
+    try {
+      const { error } = await vigilSupabase
+        .from("shopping_list")
+        .update(updates)
+        .eq("id", id);
+
+      if (error) throw error;
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      return false;
+    }
   };
 
   return {
@@ -108,6 +166,6 @@ export const useShoppingList = (householdId: string | null) => {
     addItem,
     deleteItem,
     updateItem,
-    refetch: loadItems,
+    refetch: fetchItems,
   };
 };
