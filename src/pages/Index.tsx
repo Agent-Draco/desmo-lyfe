@@ -188,16 +188,6 @@ const Index = () => {
           <InventoryView
             inventory={inventory}
             onItemClick={handleItemClick}
-            onOpenItem={async (id) => {
-              const { updateItem } = await import("@/hooks/useInventory");
-              // We need to create a temporary hook instance or use the existing one
-              // For now, we'll use the supabase client directly
-              const { supabase } = await import("@/integrations/supabase/client");
-              await supabase
-                .from("inventory_items")
-                .update({ state: 'opened' })
-                .eq("id", id);
-            }}
             loading={inventoryLoading}
           />
         );
