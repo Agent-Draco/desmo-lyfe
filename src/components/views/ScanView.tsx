@@ -16,6 +16,8 @@ interface ScanViewProps {
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [mode, setMode] = useState<"choice" | "scan" | "manual">("choice");
   const [manualName, setManualName] = useState("");
+  const [manualQuantity, setManualQuantity] = useState("1");
+  const [manualUnit, setManualUnit] = useState("pcs");
   const [manualMfgDate, setManualMfgDate] = useState("");
   const [manualBatchNumber, setManualBatchNumber] = useState("");
   const [manualExpiryDate, setManualExpiryDate] = useState("");
@@ -218,11 +220,15 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     setLoading(true);
     await onAddItem({
       name: manualName.trim(),
+      quantity: parseInt(manualQuantity) || 1,
+      unit: manualUnit,
       mfg: manualMfgDate.trim(),
       batch: manualBatchNumber.trim() || "-",
       exp: manualExpiryDate.trim(),
     });
     setManualName("");
+    setManualQuantity("1");
+    setManualUnit("pcs");
     setManualMfgDate("");
     setManualBatchNumber("");
     setManualExpiryDate("");
@@ -411,6 +417,38 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
                     onChange={(e) => setManualName(e.target.value)}
                     autoFocus
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      value={manualQuantity}
+                      onChange={(e) => setManualQuantity(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit">Unit</Label>
+                    <select
+                      id="unit"
+                      value={manualUnit}
+                      onChange={(e) => setManualUnit(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="pcs">Pieces</option>
+                      <option value="kg">KG</option>
+                      <option value="g">Grams</option>
+                      <option value="ml">ML</option>
+                      <option value="l">Liters</option>
+                      <option value="pack-small">Small Pack</option>
+                      <option value="pack-medium">Medium Pack</option>
+                      <option value="pack-large">Large Pack</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

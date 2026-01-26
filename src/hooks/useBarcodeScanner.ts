@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { BrowserMultiFormatReader, NotFoundException } from "@zxing/browser";
 
 interface ProductInfo {
   name: string;
@@ -11,9 +12,11 @@ interface ProductInfo {
 export const useBarcodeScanner = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scannedCode, setScannedCode] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const { toast } = useToast();
 
   // Try Open Food Facts first
@@ -230,6 +233,26 @@ export const useBarcodeScanner = () => {
     };
   }, [stopScanning]);
 
+  const scanBarcode = useCallback(async (): Promise<string | null> => {
+    if (!videoRef.current || !isScanning) return null;
+
+    try {
+      if (!codeReaderRef.current) {
+        codeReaderRef.current = new BrowserMultiFormatReader();
+      }
+
+      const result = await codeReaderRef.current.decodeOnceFromVideoDevice(undefined, videoRef.current);
+      const barcode = result.getText();
+      setScannedCode(barcode);
+      return barcode;
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) {
+        console.error("Barcode scanning error:", error);
+      }
+      return null;
+    }
+  }, [isScanning]);
+
   const captureFrame = useCallback((): ImageData | null => {
     if (!videoRef.current || !canvasRef.current) return null;
 
@@ -246,13 +269,25 @@ export const useBarcodeScanner = () => {
     return ctx.getImageData(0, 0, canvas.width, canvas.height);
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+      }
+      stopScanning();
+    };
+  }, [stopScanning]);
+
   return {
     isScanning,
     hasPermission,
+    scannedCode,
     videoRef,
     canvasRef,
     startScanning,
     stopScanning,
+    scanBarcode,
     captureFrame,
     lookupBarcode,
   };

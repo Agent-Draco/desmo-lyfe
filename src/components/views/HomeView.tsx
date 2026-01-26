@@ -145,7 +145,11 @@ export const HomeView = ({
                   name={item.name}
                   quantity={item.quantity}
                   expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
+                  mfgDate={item.mfg_date ? new Date(item.mfg_date) : undefined}
+                  batch={item.batch}
+                  category={item.category}
                   isInStock={!item.is_out}
+                  createdAt={new Date(item.created_at)}
                   onClick={() => onItemClick(item.id)}
                   delay={0.5 + i * 0.1}
                 />
