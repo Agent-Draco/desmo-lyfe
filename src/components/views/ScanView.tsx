@@ -10,7 +10,7 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 interface ScanViewProps {
-  onAddItem: (item: { name: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => Promise<any>;
+  onAddItem: (item: { name: string; barcode?: string; quantity?: number; unit?: string; exp?: string; mfg?: string; batch?: string }) => Promise<any>;
 }
 
 export const ScanView = ({ onAddItem }: ScanViewProps) => {

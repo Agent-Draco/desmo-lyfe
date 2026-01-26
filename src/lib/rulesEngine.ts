@@ -73,3 +73,43 @@ export const getVisualStateConfig = (state: ItemState | string): VisualStateConf
       };
   }
 };
+
+export interface Nudge {
+  type: 'recipe' | 'ebay' | 'expiry';
+  message: string;
+  itemId: string;
+}
+
+export const generateNudges = (inventory: any[]): Nudge[] => {
+  const nudges: Nudge[] = [];
+
+  inventory.forEach(item => {
+    const state = getItemState(item.expiry_date ? new Date(item.expiry_date) : undefined);
+
+    if (state === 'critical' && item.category?.toLowerCase().includes('food')) {
+      nudges.push({
+        type: 'recipe',
+        message: `Use ${item.name} in a recipe before it expires`,
+        itemId: item.id
+      });
+    }
+
+    if (state === 'critical' && item.category?.toLowerCase().includes('electronics')) {
+      nudges.push({
+        type: 'ebay',
+        message: `Consider selling ${item.name} on eBay`,
+        itemId: item.id
+      });
+    }
+
+    if (state === 'expired') {
+      nudges.push({
+        type: 'expiry',
+        message: `${item.name} has expired - time to dispose`,
+        itemId: item.id
+      });
+    }
+  });
+
+  return nudges;
+};

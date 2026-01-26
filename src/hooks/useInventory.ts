@@ -7,6 +7,7 @@ export interface InventoryItem {
   name: string;
   quantity: number;
   unit: string | null;
+  category: string | null;
   barcode: string | null;
   expiry_date: string | null;
   mfg_date: string | null;
