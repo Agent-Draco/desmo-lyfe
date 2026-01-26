@@ -4,7 +4,6 @@ import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
 import { ShoppingListWidget } from "@/components/ShoppingListWidget";
-import { NudgeFeed } from "@/components/NudgeFeed";
 import { AnimatePresence } from "framer-motion";
 import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
 import type { ShoppingListItem } from "@/hooks/useShoppingList";
@@ -17,18 +16,16 @@ interface HomeViewProps {
   onViewShoppingList?: () => void;
   shoppingListLoading?: boolean;
   loading?: boolean;
-  householdId?: string | null;
 }
 
-export const HomeView = ({
-  inventory,
-  onItemClick,
-  onQuickAdd,
+export const HomeView = ({ 
+  inventory, 
+  onItemClick, 
+  onQuickAdd, 
   shoppingList = [],
   onViewShoppingList,
   shoppingListLoading,
-  loading,
-  householdId
+  loading 
 }: HomeViewProps) => {
   const expiringCount = inventory.filter((item) => {
     if (!item.expiry_date) return false;
@@ -118,20 +115,6 @@ export const HomeView = ({
           loading={shoppingListLoading}
         />
       )}
-
-      {/* Active Nudges */}
-      <section className="mb-8">
-        <motion.h2
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider"
-        >
-          Active Nudges
-        </motion.h2>
-
-        <NudgeFeed householdId={householdId} />
-      </section>
 
       {/* Recent Items */}
       <section>
