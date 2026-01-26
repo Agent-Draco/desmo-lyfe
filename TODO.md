@@ -1,7 +1,4 @@
-- [x] Update Supabase Types (src/integrations/supabase/types.ts): Add state field to inventory_items
-- [x] Update Vigil Types (src/integrations/vigil/client.ts): Add nudge_history table
-- [x] Update Inventory Hook (src/hooks/useInventory.ts): Add category and state to interface, update fetch, add openItem function
-- [x] Update InventoryItem Component (src/components/InventoryItem.tsx): Replace status badges with state badges, add Open button
-- [x] Create NudgeFeed Component (src/components/NudgeFeed.tsx): Fetch and display active nudges
-- [x] Update InventoryView (src/components/views/InventoryView.tsx): Group by category, add category-specific displays
-- [x] Update HomeView (src/components/views/HomeView.tsx): Integrate NudgeFeed as Active Nudges
+- [ ] Task 1: Nudge Architect & Configuration - Build rules engine for Critical State thresholds (Food: 24h, Meds: 48h, Electronics: 168h)
+- [ ] Task 2: Eat Me First Recipe Engine - Add "View Recipes" button for critical Food items, integrate Spoonacular API
+- [ ] Task 3: eBay Replacement Nudge (Mockup) - Detect similar electronics and trigger eBay listing modal
+- [ ] Task 4: High-Fidelity State Machine - Implement NEW/ACTIVE/CRITICAL/LISTED visual states with manual pulse button
