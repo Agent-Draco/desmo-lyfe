@@ -173,7 +173,7 @@ const Auth = () => {
         }} className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center">
             <span className="text-4xl">🥗</span>
           </motion.div>
-          <h1 className="text-3xl font-bold text-foreground">Desmo</h1>
+          <h1 className="text-3xl font-bold text-foreground">AsteRISK</h1>
           <p className="text-muted-foreground mt-2">Family Kitchen Inventory</p>
         </div>
 
