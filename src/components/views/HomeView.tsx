@@ -4,11 +4,7 @@ import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
 import { ShoppingListWidget } from "@/components/ShoppingListWidget";
-import { NudgeFeed } from "@/components/NudgeFeed";
-import { RecipeDrawer } from "@/components/RecipeDrawer";
-import { EbayListingModal } from "@/components/EbayListingModal";
 import { AnimatePresence } from "framer-motion";
-import { useState } from "react";
 import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
 import type { ShoppingListItem } from "@/hooks/useShoppingList";
 
@@ -22,20 +18,15 @@ interface HomeViewProps {
   loading?: boolean;
 }
 
-export const HomeView = ({
-  inventory,
-  onItemClick,
-  onQuickAdd,
+export const HomeView = ({ 
+  inventory, 
+  onItemClick, 
+  onQuickAdd, 
   shoppingList = [],
   onViewShoppingList,
   shoppingListLoading,
-  loading
+  loading 
 }: HomeViewProps) => {
-  const [recipeDrawerOpen, setRecipeDrawerOpen] = useState(false);
-  const [selectedIngredient, setSelectedIngredient] = useState("");
-  const [ebayModalOpen, setEbayModalOpen] = useState(false);
-  const [ebayItem, setEbayItem] = useState<{name: string, category: string} | null>(null);
-
   const expiringCount = inventory.filter((item) => {
     if (!item.expiry_date) return false;
     const days = Math.ceil(
@@ -46,16 +37,6 @@ export const HomeView = ({
 
   const inStockCount = inventory.filter(item => !item.is_out).length;
   const outOfStockCount = inventory.filter(item => item.is_out).length;
-
-  const handleViewRecipes = (ingredient: string) => {
-    setSelectedIngredient(ingredient);
-    setRecipeDrawerOpen(true);
-  };
-
-  const handleEbayNudge = (item: {name: string, category: string}) => {
-    setEbayItem(item);
-    setEbayModalOpen(true);
-  };
 
   return (
     <>

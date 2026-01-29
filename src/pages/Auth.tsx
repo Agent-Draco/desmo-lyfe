@@ -114,7 +114,7 @@ const Auth = () => {
         if (error) throw error;
         toast({
           title: "Account created!",
-          description: "Welcome to asterisk. Let's set up your kitchen."
+          description: "Welcome to Desmo. Let's set up your kitchen."
         });
       }
     } catch (error: any) {

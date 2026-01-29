@@ -1,22 +1,29 @@
-# Comm Tab Marketplace Implementation Plan
+# TODO: Implement All App Features
 
-## 1. Navigation Updates
-- [ ] Add "comm" tab to GlassNav.tsx navItems array (using Users icon)
-- [ ] Update Index.tsx to include "comm" case in renderView switch statement
-- [ ] Import and render CommView component in Index.tsx
+## Steps to Complete
 
-## 2. CommView Component Creation
-- [ ] Create src/components/views/CommView.tsx with marketplace interface
-- [ ] Implement dual modes: S-Comm (community sharing) and B-Comm (secondary market)
-- [ ] Build request/handshake workflow UI
-- [ ] Create real-time chat negotiation system using Supabase subscriptions
-- [ ] Integrate item lifecycle management
+- [x] **Manual Entry Enhancement:** Add mfg date, batch number (optional, default "-"), expiry date fields to ScanView manual mode
+- [x] **Quick Add Automation:** Update quick add to automatically calculate mfg/exp dates based on current date and market standards, set batch to "-"
+- [x] **Shopping List Feature:** Create new shopping list view, hook, and UI; integrate deletion when items added to inventory
+- [x] **Camera Permissions Fix:** Update useBarcodeScanner to properly handle permissions
+- [x] **Device Registration Display:** Show registered devices in VigilSetup page
+- [x] **Settings Buttons:** Make profile, notifications, appearance, privacy buttons functional
+- [x] **Themes System:** Implement multiple light/dark themes changeable from settings
+- [x] **Pop-up Reminders:** Add overlay notifications for expiring items with add to shopping list option
+- [x] **Expiry Disposal:** Keep expired items in inventory for 3 days then delete
 
-## 3. Auth Page Update
-- [ ] Remove title and spanning emoji from Auth.tsx
-- [ ] Replace with asterisk.png image import and display
+# New Tasks
 
-## 4. Design Implementation
-- [ ] Apply glassmorphism styling consistent with existing components
-- [ ] Use safety green and royal purple accents as specified
-- [ ] Ensure responsive design matching app's aesthetic
+- [x] Task 1: Nudge Architect & Configuration - Build rules engine for Critical State thresholds (Food: 24h, Meds: 48h, Electronics: 168h)
+- [x] Task 2: Eat Me First Recipe Engine - Add "View Recipes" button for critical Food items, integrate Spoonacular API
+- [x] Task 3: eBay Replacement Nudge (Mockup) - Detect similar electronics and trigger eBay listing modal
+- [x] Task 4: High-Fidelity State Machine - Implement NEW/ACTIVE/CRITICAL/LISTED visual states with manual pulse button
+
+## Implementation Steps
+
+1. Resolve merge conflict in InventoryItem.tsx
+2. Build rulesEngine.ts with threshold logic
+3. Update GlassCard.tsx for visual states
+4. Add View Recipes button to InventoryItem.tsx
+5. Implement eBay mockup nudge logic
+6. Add Manual Pulse button to InventoryItem.tsx

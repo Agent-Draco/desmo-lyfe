@@ -8,7 +8,7 @@ import { useVigilSettings } from "@/hooks/useVigilSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { vigilSupabase } from "@/integrations/vigil/client";
 import { ArrowLeft, Loader2, Wifi, Check, AlertCircle, Monitor } from "lucide-react";
-import asteriskLogo from "@/assets/asterisk.png";
+import desmoLogo from "@/assets/asterisk.png";
 
 interface RegisteredDevice {
   device_serial: string;
@@ -136,7 +136,7 @@ const VigilSetup = () => {
           type: "spring",
           duration: 0.6
         }} className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center p-2">
-            <img src={asteriskLogo} alt="asterisk Logo" className="w-full h-full object-contain" />
+            <img src={desmoLogo} alt="Desmo Logo" className="w-full h-full object-contain" />
           </motion.div>
           <h1 className="text-2xl font-bold text-foreground">Setup AsteRISK Surface</h1>
           <p className="text-muted-foreground mt-2">Connect your AsteRISK Surface to your household</p>
