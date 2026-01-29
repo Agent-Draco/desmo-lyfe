@@ -51,14 +51,10 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({
   if (useLiquidGlass) {
     return (
       <LiquidGlass
-        surfaceType={liquidGlassProps.surfaceType || 'convex-squircle'}
-        bezelWidth={liquidGlassProps.bezelWidth || 20}
-        glassThickness={liquidGlassProps.glassThickness || 8}
-        refractiveIndex={liquidGlassProps.refractiveIndex || 1.5}
-        scale={liquidGlassProps.scale || 0.6}
-        specularIntensity={liquidGlassProps.specularIntensity || 0.2}
+        intensity={liquidGlassProps.intensity || 'medium'}
+        shape={liquidGlassProps.shape || 'rounded'}
         className={cn(
-          "glass-card p-5 cursor-pointer transition-all duration-300",
+          "p-5 cursor-pointer transition-all duration-300",
           isExpiring && "glow-warning border-warning/50",
           className
         )}
