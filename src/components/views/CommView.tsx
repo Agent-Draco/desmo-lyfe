@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Users, Package, Send, Clock, CheckCircle, XCircle, ArrowLeft, Plus, Search, Filter, Box } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -666,7 +667,7 @@ const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, prefill
     expiry_date: prefillData?.expiry_date || ""
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
   };
