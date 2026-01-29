@@ -5,8 +5,9 @@ import { GlassCard } from "@/components/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import { createWorker } from 'tesseract.js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import jsQR from "jsqr";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 interface ScanViewProps {
   onAddItem: (item: { name: string; barcode?: string; quantity?: number; unit?: string; exp?: string; mfg?: string; batch?: string }) => Promise<any>;

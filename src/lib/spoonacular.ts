@@ -32,60 +32,13 @@ export interface Recipe {
   }>;
 }
 
-export interface SpoonSureProfile {
-  enabled: boolean;
-  dietType: 'veg' | 'non-veg' | 'vegan' | 'jain';
-  allergies: string[];
-  customPreferences: string;
-}
-
 /**
- * Find recipes by ingredients using Spoonacular API with profile preferences
+ * Find recipes by ingredients using Spoonacular API
  */
-export async function findRecipesByIngredients(
-  ingredients: string[],
-  profile?: SpoonSureProfile
-): Promise<Recipe[]> {
+export async function findRecipesByIngredients(ingredients: string[]): Promise<Recipe[]> {
   try {
-    let url = `${SPOONACULAR_BASE_URL}/recipes/findByIngredients?apiKey=${SPOONACULAR_API_KEY}&ingredients=${encodeURIComponent(ingredients.join(', '))}&number=5&ranking=1`;
-
-    // Add dietary restrictions based on profile
-    if (profile) {
-      const intolerances = profile.allergies.map(allergy =>
-        allergy.toLowerCase().replace(' ', '')
-      ).join(',');
-
-      if (intolerances) {
-        url += `&intolerances=${encodeURIComponent(intolerances)}`;
-      }
-
-      // Add diet type
-      switch (profile.dietType) {
-        case 'vegan':
-          url += `&diet=vegan`;
-          break;
-        case 'veg':
-          url += `&diet=vegetarian`;
-          break;
-        case 'jain':
-          // Jain diet is vegetarian but excludes root vegetables, onions, garlic
-          url += `&diet=vegetarian&excludeIngredients=onion,garlic,potato`;
-          break;
-        // non-veg doesn't need special filtering
-      }
-
-      // Add custom preferences to query if available
-      if (profile.customPreferences.trim()) {
-        // This is a simple implementation - in a real app you'd parse the custom preferences
-        const customPrefs = profile.customPreferences.toLowerCase();
-        if (customPrefs.includes('low carb')) {
-          url += `&diet=ketogenic`;
-        } else if (customPrefs.includes('gluten free')) {
-          url += `&diet=gluten free`;
-        }
-        // Add more custom preference parsing as needed
-      }
-    }
+    const ingredientsQuery = ingredients.join(',');
+    const url = `${SPOONACULAR_BASE_URL}/recipes/findByIngredients?apiKey=${SPOONACULAR_API_KEY}&ingredients=${encodeURIComponent(ingredientsQuery)}&number=5&ranking=1`;
 
     const response = await fetch(url);
     if (!response.ok) {

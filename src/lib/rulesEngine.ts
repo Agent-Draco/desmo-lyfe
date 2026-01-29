@@ -75,14 +75,9 @@ export const getVisualStateConfig = (state: ItemState | string): VisualStateConf
 };
 
 export interface Nudge {
-  type: 'recipe' | 'ebay' | 'expiry' | 'active-recipe';
+  type: 'recipe' | 'ebay' | 'expiry';
   message: string;
   itemId: string;
-  recipeData?: {
-    title: string;
-    id: number;
-    image: string;
-  };
 }
 
 export const generateNudges = (inventory: any[]): Nudge[] => {
@@ -90,15 +85,6 @@ export const generateNudges = (inventory: any[]): Nudge[] => {
 
   inventory.forEach(item => {
     const state = getItemState(item.expiry_date ? new Date(item.expiry_date) : undefined);
-
-    // Active recipe nudges for food items (not expired)
-    if (item.category?.toLowerCase().includes('food') && state !== 'expired') {
-      nudges.push({
-        type: 'active-recipe',
-        message: `Try a new recipe with ${item.name}`,
-        itemId: item.id
-      });
-    }
 
     if (state === 'critical' && item.category?.toLowerCase().includes('food')) {
       nudges.push({

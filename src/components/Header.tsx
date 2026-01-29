@@ -6,14 +6,12 @@ interface HeaderProps {
   userName?: string;
   householdName?: string;
   notificationCount?: number;
-  onAddClick?: () => void;
 }
 
-export const Header = ({
-  userName = "Guest",
+export const Header = ({ 
+  userName = "Guest", 
   householdName = "My Kitchen",
-  notificationCount = 0,
-  onAddClick
+  notificationCount = 0 
 }: HeaderProps) => {
   return (
     <motion.header
@@ -28,7 +26,7 @@ export const Header = ({
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring", bounce: 0.4 }}
-            className="w-10 h-10 rounded-lg overflow-hidden bg-white flex items-center justify-center p-1"
+            className="w-10 h-10 rounded-lg overflow-hidden bg-background/50 flex items-center justify-center p-1"
           >
             <img src={asteriskLogo} alt="asterisk" className="w-full h-full object-contain" />
           </motion.div>
