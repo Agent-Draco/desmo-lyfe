@@ -9,7 +9,7 @@ interface NudgeFeedProps {
   inventory: any[];
 }
 
-export const NudgeFeed = ({ inventory }: NudgeFeedProps) => {
+export const NudgeFeed = ({ inventory, onNudgeAction }: NudgeFeedProps) => {
   const [nudges, setNudges] = useState([]);
 
   useEffect(() => {
@@ -41,7 +41,10 @@ export const NudgeFeed = ({ inventory }: NudgeFeedProps) => {
                 <div className="flex-1">
                   <p className="text-sm text-foreground">{nudge.message}</p>
                 </div>
-                <button className="text-primary hover:text-primary/80">
+                <button
+                  onClick={() => onNudgeAction?.(nudge)}
+                  className="text-primary hover:text-primary/80"
+                >
                   <ExternalLink className="w-4 h-4" />
                 </button>
               </div>

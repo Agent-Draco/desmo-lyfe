@@ -15,6 +15,8 @@ interface PopUpReminderProps {
   expiringItems: ExpiringItem[];
   onDismiss: () => void;
   onAddToShoppingList: (itemName: string) => void;
+  dismissedItems?: Set<string>;
+  onItemDismissed?: (itemId: string) => void;
 }
 
 export const PopUpReminder = ({
@@ -22,6 +24,8 @@ export const PopUpReminder = ({
   expiringItems,
   onDismiss,
   onAddToShoppingList,
+  dismissedItems = new Set(),
+  onItemDismissed,
 }: PopUpReminderProps) => {
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
@@ -50,6 +54,9 @@ export const PopUpReminder = ({
   };
 
   const handleSkip = () => {
+    if (onItemDismissed) {
+      onItemDismissed(currentItem.id);
+    }
     handleNext();
   };
 

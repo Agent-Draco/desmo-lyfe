@@ -10,14 +10,26 @@ export interface VisualStateConfig {
   showPulse: boolean;
 }
 
-export const getItemState = (expiryDate?: Date): ItemState => {
+export const getItemState = (expiryDate?: Date, category?: string | null): ItemState => {
   if (!expiryDate) return 'active';
 
   const now = new Date();
   const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   if (daysUntilExpiry < 0) return 'expired';
-  if (daysUntilExpiry <= 1) return 'critical'; // Food: 24h, Meds: 48h, Electronics: 168h - using 24h as threshold
+
+  // Category-specific critical thresholds
+  const categoryLower = category?.toLowerCase() || '';
+  let criticalThreshold = 1; // default 24h
+
+  if (categoryLower.includes('med') || categoryLower.includes('medicine') || categoryLower.includes('pharma')) {
+    criticalThreshold = 2; // 48h for meds
+  } else if (categoryLower.includes('electronic') || categoryLower.includes('device') || categoryLower.includes('gadget')) {
+    criticalThreshold = 7; // 168h (7 days) for electronics
+  }
+  // Food and others use 24h (1 day)
+
+  if (daysUntilExpiry <= criticalThreshold) return 'critical';
   return 'active';
 };
 
@@ -84,7 +96,7 @@ export const generateNudges = (inventory: any[]): Nudge[] => {
   const nudges: Nudge[] = [];
 
   inventory.forEach(item => {
-    const state = getItemState(item.expiry_date ? new Date(item.expiry_date) : undefined);
+    const state = getItemState(item.expiry_date ? new Date(item.expiry_date) : undefined, item.category);
 
     if (state === 'critical' && item.category?.toLowerCase().includes('food')) {
       nudges.push({

@@ -3,7 +3,7 @@ import { GlassCard } from "./GlassCard";
 import { cn } from "@/lib/utils";
 import {
   Package, Clock, Milk, Egg, Croissant, Beef, Drumstick, Apple, Carrot,
-  Snowflake, Wine, Cookie, Droplet, Wheat, Fish, Calendar, Hash, Zap
+  Snowflake, Wine, Cookie, Droplet, Wheat, Fish, Calendar, Hash, Zap, ChefHat
 } from "lucide-react";
 import { getVisualStateConfig, getItemState } from "@/lib/rulesEngine";
 
@@ -22,6 +22,8 @@ interface InventoryItemProps {
   onClick?: () => void;
   onOpen?: () => void;
   onTap?: () => void;
+  onViewRecipes?: () => void;
+  onPulse?: () => void;
   delay?: number;
 }
 
@@ -38,9 +40,11 @@ export const InventoryItem = ({
   onClick,
   onOpen,
   onTap,
+  onViewRecipes,
+  onPulse,
   delay = 0
 }: InventoryItemProps) => {
-  const visualState = getVisualStateConfig(state || getItemState(expiryDate));
+  const visualState = getVisualStateConfig(state || getItemState(expiryDate, category));
   const isExpiring = visualState.variant === 'warning' || visualState.variant === 'destructive';
 
   const getCategoryIcon = (categoryName?: string | null) => {
@@ -170,6 +174,37 @@ export const InventoryItem = ({
               </span>
             </div>
           )}
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 mt-2">
+            {/* View Recipes button for critical food items */}
+            {visualState.variant === 'warning' && category?.toLowerCase().includes('food') && onViewRecipes && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewRecipes();
+                }}
+                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-full transition-colors"
+              >
+                <ChefHat className="w-3 h-3" />
+                View Recipes
+              </button>
+            )}
+
+            {/* Manual Pulse button */}
+            {onPulse && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPulse();
+                }}
+                className="flex items-center gap-1 text-xs text-warning hover:text-warning/80 bg-warning/10 hover:bg-warning/20 px-2 py-1 rounded-full transition-colors"
+              >
+                <Zap className="w-3 h-3" />
+                Pulse
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Pulse indicator for critical items */}

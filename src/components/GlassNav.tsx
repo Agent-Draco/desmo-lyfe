@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Home, Package, Users, Settings, Scan, ShoppingCart } from "lucide-react";
+import { Home, Package, Users, Settings, Scan, ShoppingCart, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GlassNavProps {
@@ -12,6 +12,7 @@ const navItems = [
   { id: "inventory", icon: Package, label: "Inventory" },
   { id: "scan", icon: Scan, label: "Scan" },
   { id: "shopping", icon: ShoppingCart, label: "Shop" },
+  { id: "nudges", icon: Bell, label: "Nudges" },
   { id: "settings", icon: Settings, label: "Settings" },
 ];
 

@@ -1,19 +1,22 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ReactNode, forwardRef } from "react";
+import { VisualStateConfig } from "@/lib/rulesEngine";
 
 interface GlassCardProps {
   children: ReactNode;
   className?: string;
   isExpiring?: boolean;
+  visualState?: VisualStateConfig;
   onClick?: () => void;
   delay?: number;
 }
 
-export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({ 
-  children, 
-  className, 
+export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({
+  children,
+  className,
   isExpiring = false,
+  visualState,
   onClick,
   delay = 0
 }, ref) => {
@@ -29,6 +32,8 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({
       className={cn(
         "glass-card p-5 cursor-pointer transition-all duration-300",
         isExpiring && "glow-warning border-warning/50",
+        visualState && visualState.variant === 'critical' && "glow-warning border-warning/50",
+        visualState && visualState.variant === 'expired' && "glow-destructive border-destructive/50",
         className
       )}
     >
