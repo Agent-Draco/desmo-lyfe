@@ -217,10 +217,11 @@ const Index = () => {
       removalMode ? "removal-mode" : "bg-background"
     )}>
       <SuccessFlash isVisible={showFlash} />
-      <Header 
-        userName={profile?.display_name || "User"} 
+      <Header
+        userName={profile?.display_name || "User"}
         householdName={household?.name || "Kitchen"}
         notificationCount={notificationCount}
+        onAddClick={() => setActiveTab("scan")}
       />
       
       <main className="pt-24 pb-44 px-4 max-w-4xl mx-auto">
