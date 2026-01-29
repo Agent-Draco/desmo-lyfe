@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Bell, Plus } from "lucide-react";
-import desmoLogo from "@/assets/desmo-logo.png";
+import desmoLogo from "@/assets/Asterisk.png";
 
 interface HeaderProps {
   userName?: string;
