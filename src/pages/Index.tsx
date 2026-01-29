@@ -405,7 +405,10 @@ const Index = () => {
           await addShoppingItem({ item_name: itemName, quantity: 1 });
           setShowReminder(false);
         }}
-        onSeeRecipes={(ingredient) => setRecipeIngredient(ingredient)}
+        onSeeRecipes={(ingredient) => {
+          setRecipeIngredient(ingredient);
+          setShowReminder(false);
+        }}
         commListings={commListings}
       />
 

@@ -138,7 +138,7 @@ export const RecipeDrawer = ({ isOpen, onClose, ingredient }: RecipeDrawerProps)
                     >
                       <div className="flex gap-3">
                         <img
-                          src={`https://spoonacular.com/recipeImages/${recipe.id}-312x231.${recipe.imageType}`}
+                          src={recipe.image || `https://spoonacular.com/recipeImages/${recipe.id}-312x231.${recipe.imageType}`}
                           alt={recipe.title}
                           className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                           onError={(e) => {
@@ -197,7 +197,7 @@ export const RecipeDrawer = ({ isOpen, onClose, ingredient }: RecipeDrawerProps)
                       </div>
 
                       <img
-                        src={`https://spoonacular.com/recipeImages/${selectedRecipe.id}-636x393.${selectedRecipe.imageType}`}
+                        src={selectedRecipe.image || `https://spoonacular.com/recipeImages/${selectedRecipe.id}-636x393.${selectedRecipe.imageType}`}
                         alt={selectedRecipe.title}
                         className="w-full h-48 object-cover rounded-lg mb-4"
                         onError={(e) => {

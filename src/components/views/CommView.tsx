@@ -608,7 +608,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-card p-6 w-full max-w-md"
+              className="glass-card p-4 w-full max-w-sm max-h-[80vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-xl font-bold text-foreground mb-4">Create Listing</h3>
@@ -618,6 +618,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
                   setShowCreateForm(false);
                   setSelectedInventoryItem(null);
                 }}
+                loading={loading}
                 categories={categories.filter((c) => c !== "all")}
                 conditions={conditions}
                 initialMode={activeMode}
@@ -638,8 +639,9 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
 };
 
 interface CreateListingFormProps {
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<void> | void;
   onCancel: () => void;
+  loading?: boolean;
   categories: string[];
   conditions: string[];
   initialMode: "s-comm" | "b-comm";
@@ -652,7 +654,7 @@ interface CreateListingFormProps {
   };
 }
 
-const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, initialMode, prefillData }: CreateListingFormProps) => {
+const CreateListingForm = ({ onSubmit, onCancel, loading, categories, conditions, initialMode, prefillData }: CreateListingFormProps) => {
   const [formData, setFormData] = useState({
     title: prefillData?.title || "",
     description: prefillData?.description || "",
@@ -676,9 +678,9 @@ const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, initial
     }));
   }, [prefillData?.title, prefillData?.description, prefillData?.category, prefillData?.item_name, prefillData?.expiry_date]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    await onSubmit(formData);
   };
 
   return (
@@ -819,15 +821,17 @@ const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, initial
         <button
           type="button"
           onClick={onCancel}
+          disabled={loading}
           className="flex-1 py-2 bg-background/50 text-foreground rounded-xl hover:bg-background/70 transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
+          disabled={loading}
           className="flex-1 py-2 bg-gradient-to-r from-emerald-500 to-purple-500 text-white rounded-xl hover:opacity-90 transition-opacity"
         >
-          Create Listing
+          {loading ? "Creating..." : "Create Listing"}
         </button>
       </div>
     </form>

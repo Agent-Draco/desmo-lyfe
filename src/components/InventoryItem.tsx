@@ -92,6 +92,12 @@ export const InventoryItem = ({
   const daysUntilExpiry = getDaysUntilExpiry(expiryDate);
 
   const getLifetimeGlowClass = (mfg?: Date, exp?: Date) => {
+    // Red glow: within a week of expiry (or expired)
+    if (exp) {
+      const expDays = getDaysUntilExpiry(exp);
+      if (typeof expDays === "number" && expDays <= 7) return "glow-red";
+    }
+
     if (!mfg || !exp) return undefined;
     const start = mfg.getTime();
     const end = exp.getTime();
@@ -105,8 +111,7 @@ export const InventoryItem = ({
     // - 50%: green
     // - 75%: yellow
     // - 90%: orange
-    // - 95%: red
-    if (progress >= 0.95) return "glow-red";
+    // - red handled above (week before expiry)
     if (progress >= 0.9) return "glow-orange";
     if (progress >= 0.75) return "glow-yellow";
     if (progress >= 0.5) return "glow-green";

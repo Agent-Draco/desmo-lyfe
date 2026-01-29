@@ -86,6 +86,7 @@ export const PopUpReminder = ({
 
   const handleSeeRecipes = () => {
     onSeeRecipes?.(currentItem.name);
+    onDismiss();
   };
 
   const handleSkip = () => {
