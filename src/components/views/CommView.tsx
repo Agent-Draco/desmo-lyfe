@@ -22,7 +22,6 @@ interface InventoryItem {
   category?: string;
   expiry_date?: string;
   manufacturing_date?: string;
-  batch_number?: string;
   status?: "in" | "opened" | "out";
   is_out?: boolean;
 }

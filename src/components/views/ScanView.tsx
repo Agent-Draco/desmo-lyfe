@@ -23,7 +23,6 @@ interface ScanViewProps {
     unit?: string;
     exp?: string;
     mfg?: string;
-    batch?: string;
     item_type?: "food" | "medicine";
     medicine_is_dosaged?: boolean;
     medicine_dose_amount?: number;
@@ -40,7 +39,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [manualQuantity, setManualQuantity] = useState("1");
   const [manualUnit, setManualUnit] = useState("pcs");
   const [manualMfgDate, setManualMfgDate] = useState("");
-  const [manualBatchNumber, setManualBatchNumber] = useState("");
   const [manualExpiryDate, setManualExpiryDate] = useState("");
   const [manualItemType, setManualItemType] = useState<"food" | "medicine">("food");
   const [manualMedicineIsDosaged, setManualMedicineIsDosaged] = useState(false);
@@ -49,7 +47,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [manualDoseTimesRaw, setManualDoseTimesRaw] = useState("09:00, 21:00");
   const [loading, setLoading] = useState(false);
   const [ocrText, setOcrText] = useState<string>("");
-  const [photoResult, setPhotoResult] = useState<{ name: string; mfg?: string; exp?: string; batch?: string } | null>(null);
+  const [photoResult, setPhotoResult] = useState<{ name: string; mfg?: string; exp?: string } | null>(null);
   const [scannedProduct, setScannedProduct] = useState<{
     name: string;
     barcode: string;
@@ -250,7 +248,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     }
   }, [videoRef, handleBarcodeDetected]);
 
-  const extractDatesAndBatch = (text: string) => {
+  const extractDates = (text: string) => {
     const normalized = text.replace(/\s+/g, " ").trim();
 
     const dateLike = (label: string) => {
@@ -265,10 +263,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     const exp = dateLike("(exp|expiry|expires)");
     const mfg = dateLike("(mfg|mfd|manufactured)");
 
-    const batchMatch = normalized.match(/(batch|lot)\s*[:#-]?\s*([A-Z0-9-]{3,})/i);
-    const batch = batchMatch?.[2] || undefined;
-
-    return { exp, mfg, batch };
+    return { exp, mfg };
   };
 
   const canvasToBase64 = (canvas: HTMLCanvasElement) => {
@@ -331,16 +326,15 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   };
 
   const runGeminiParse = async (ocrTextInput: string, visionHint?: string) => {
-    if (!GEMINI_API_KEY) return { name: undefined as string | undefined, mfg: undefined as string | undefined, exp: undefined as string | undefined, batch: undefined as string | undefined };
+    if (!GEMINI_API_KEY) return { name: undefined as string | undefined, mfg: undefined as string | undefined, exp: undefined as string | undefined };
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `Extract product info from OCR text. Return ONLY strict JSON with keys: name, mfg, exp, batch.
+    const prompt = `Extract product info from OCR text. Return ONLY strict JSON with keys: name, mfg, exp.
 
 Rules:
 - mfg and exp must be YYYY-MM-DD if possible.
-- batch should be alphanumeric (may include -).
 - If unknown, use null.
 
 Vision hint (may be null): ${visionHint ?? "null"}
@@ -363,10 +357,9 @@ OCR text:\n${ocrTextInput}`;
         name: typeof parsed?.name === "string" ? parsed.name : undefined,
         mfg: safeIsoDate(parsed?.mfg),
         exp: safeIsoDate(parsed?.exp),
-        batch: typeof parsed?.batch === "string" ? parsed.batch : undefined,
       };
     } catch {
-      return { name: undefined, mfg: undefined, exp: undefined, batch: undefined };
+      return { name: undefined, mfg: undefined, exp: undefined };
     }
   };
 
@@ -394,7 +387,7 @@ OCR text:\n${ocrTextInput}`;
       const text = data?.text ?? "";
       setOcrText(text);
 
-      const extracted = extractDatesAndBatch(text);
+      const extracted = extractDates(text);
 
       const base64 = canvasToBase64(canvas);
       let visionName: string | undefined;
@@ -405,7 +398,7 @@ OCR text:\n${ocrTextInput}`;
         // ignore vision errors
       }
 
-      let geminiParsed: { name?: string; mfg?: string; exp?: string; batch?: string } = {};
+      let geminiParsed: { name?: string; mfg?: string; exp?: string } = {};
       try {
         geminiParsed = await runGeminiParse(text, visionName);
       } catch (e) {
@@ -426,7 +419,6 @@ OCR text:\n${ocrTextInput}`;
         name: finalName,
         mfg: geminiParsed.mfg ?? extracted.mfg,
         exp: geminiParsed.exp ?? extracted.exp,
-        batch: geminiParsed.batch ?? extracted.batch,
       });
     } catch (err) {
       console.error("Photo OCR failed:", err);
@@ -522,7 +514,6 @@ OCR text:\n${ocrTextInput}`;
       quantity: parseInt(manualQuantity) || 1,
       unit: manualUnit,
       mfg: manualMfgDate.trim(),
-      batch: manualBatchNumber.trim() || "-",
       exp: manualExpiryDate.trim(),
       item_type: manualItemType,
       medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
@@ -537,7 +528,6 @@ OCR text:\n${ocrTextInput}`;
     setManualQuantity("1");
     setManualUnit("pcs");
     setManualMfgDate("");
-    setManualBatchNumber("");
     setManualExpiryDate("");
     setManualItemType("food");
     setManualMedicineIsDosaged(false);
@@ -762,16 +752,6 @@ OCR text:\n${ocrTextInput}`;
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="photoBatch">Batch</Label>
-                  <Input
-                    id="photoBatch"
-                    value={photoResult?.batch ?? ""}
-                    onChange={(e) => setPhotoResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), batch: e.target.value }))}
-                    placeholder="Batch / Lot"
-                  />
-                </div>
-
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -795,7 +775,6 @@ OCR text:\n${ocrTextInput}`;
                         name,
                         mfg: photoResult?.mfg,
                         exp: photoResult?.exp,
-                        batch: photoResult?.batch || "-",
                         item_type: manualItemType,
                         medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
                         medicine_dose_amount: manualItemType === "medicine" && manualMedicineIsDosaged ? Number(manualDoseAmount) || 1 : undefined,
@@ -1126,17 +1105,6 @@ OCR text:\n${ocrTextInput}`;
                     type="date"
                     value={manualMfgDate}
                     onChange={(e) => setManualMfgDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="batch">Batch Number (Optional)</Label>
-                  <Input
-                    id="batch"
-                    type="text"
-                    placeholder="e.g., LOT123"
-                    value={manualBatchNumber}
-                    onChange={(e) => setManualBatchNumber(e.target.value)}
                   />
                 </div>
 

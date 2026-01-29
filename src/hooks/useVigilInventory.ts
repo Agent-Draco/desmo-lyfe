@@ -98,7 +98,7 @@ export const useVigilInventory = (householdId: string | null) => {
     }
   };
 
-  const addItem = async (item: { name: string; exp?: string; mfg?: string; batch?: string }) => {
+  const addItem = async (item: { name: string; exp?: string; mfg?: string }) => {
     if (!householdId) return null;
 
     try {
@@ -118,7 +118,6 @@ export const useVigilInventory = (householdId: string | null) => {
           status: "in",
           exp: expDate,
           mfg: item.mfg || null,
-          batch: item.batch || null,
         })
         .select()
         .single();

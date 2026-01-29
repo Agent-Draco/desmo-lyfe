@@ -11,7 +11,6 @@ export interface InventoryItem {
   barcode: string | null;
   expiry_date: string | null;
   mfg_date: string | null;
-  batch: string | null;
   item_type?: string;
   medicine_is_dosaged?: boolean;
   medicine_dose_amount?: number | null;
@@ -87,7 +86,6 @@ export const useInventory = (householdId: string | null) => {
       const mappedItems: InventoryItem[] = (data || []).map((item: any) => ({
         ...item,
         mfg_date: item.manufacturing_date ?? null,
-        batch: item.batch_number ?? null,
       }));
 
       setItems(mappedItems);
@@ -178,7 +176,6 @@ export const useInventory = (householdId: string | null) => {
     barcode?: string;
     expiry_date?: string;
     manufacturing_date?: string;
-    batch_number?: string;
     item_type?: "food" | "medicine";
     medicine_is_dosaged?: boolean;
     medicine_dose_amount?: number;
@@ -204,7 +201,6 @@ export const useInventory = (householdId: string | null) => {
           barcode: item.barcode,
           expiry_date: item.expiry_date,
           manufacturing_date: item.manufacturing_date,
-          batch_number: item.batch_number,
           item_type: item.item_type || "food",
           medicine_is_dosaged: item.medicine_is_dosaged ?? false,
           medicine_dose_amount: item.medicine_dose_amount,

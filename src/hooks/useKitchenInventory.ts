@@ -9,7 +9,6 @@ export interface KitchenInventoryItem {
   barcode: string | null;
   expiry_date: string | null;
   mfg_date: string | null;
-  batch: string | null;
   is_out: boolean;
   added_by: string | null;
   created_at: string;
@@ -46,7 +45,6 @@ export const useKitchenInventory = (householdId: string | null) => {
         barcode: null,
         expiry_date: it.exp ?? null,
         mfg_date: it.mfg ?? null,
-        batch: it.batch ?? null,
         is_out: it.status === "out",
         added_by: null,
         created_at: createdAt,
@@ -57,12 +55,11 @@ export const useKitchenInventory = (householdId: string | null) => {
     });
   }, [vigilItems]);
 
-  const addItem = async (item: { name: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => {
+  const addItem = async (item: { name: string; barcode?: string; exp?: string; mfg?: string }) => {
     return await vigilAddItem({
       name: item.name,
       exp: item.exp,
       mfg: item.mfg,
-      batch: item.batch,
     });
   };
 

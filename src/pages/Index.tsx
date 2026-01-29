@@ -168,8 +168,7 @@ const Index = () => {
       name,
       category: preset?.category,
       manufacturing_date: manufacturingDate,
-      expiry_date: expiryDate,
-      batch_number: "-"
+      expiry_date: expiryDate
     });
   };
 
@@ -178,7 +177,6 @@ const Index = () => {
     barcode?: string;
     exp?: string;
     mfg?: string;
-    batch?: string;
     item_type?: "food" | "medicine";
     medicine_is_dosaged?: boolean;
     medicine_dose_amount?: number;
@@ -192,7 +190,6 @@ const Index = () => {
       barcode: item.barcode,
       expiry_date: item.exp,
       manufacturing_date: item.mfg,
-      batch_number: item.batch,
       item_type: item.item_type,
       medicine_is_dosaged: item.medicine_is_dosaged,
       medicine_dose_amount: item.medicine_dose_amount,

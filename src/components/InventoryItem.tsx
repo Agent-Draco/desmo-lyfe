@@ -3,7 +3,7 @@ import { GlassCard } from "./GlassCard";
 import { cn } from "@/lib/utils";
 import {
   Package, Clock, Milk, Egg, Croissant, Beef, Drumstick, Apple, Carrot,
-  Snowflake, Wine, Cookie, Droplet, Wheat, Fish, Calendar, Hash, Zap
+  Snowflake, Wine, Cookie, Droplet, Wheat, Fish, Calendar, Zap
 } from "lucide-react";
 import { getVisualStateConfig, getItemState } from "@/lib/rulesEngine";
 
@@ -13,7 +13,6 @@ interface InventoryItemProps {
   quantity: number;
   expiryDate?: Date;
   mfgDate?: Date;
-  batch?: string | null;
   isInStock?: boolean;
   state?: string | null;
   category?: string | null;
@@ -31,7 +30,6 @@ export const InventoryItem = ({
   quantity,
   expiryDate,
   mfgDate,
-  batch,
   isInStock = true,
   state,
   category,
@@ -188,12 +186,6 @@ export const InventoryItem = ({
                     {daysUntilExpiry <= 0 ? "Expired" : `${daysUntilExpiry}d`}
                   </span>
                 )}
-              </div>
-            )}
-            {batch && batch !== "-" && (
-              <div className="flex items-center gap-1">
-                <Hash className="w-3 h-3" />
-                <span>{batch}</span>
               </div>
             )}
           </div>

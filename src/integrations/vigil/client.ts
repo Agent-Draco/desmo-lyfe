@@ -26,7 +26,6 @@ export interface VigilInventoryItem {
   status: "in" | "opened" | "out";
   mfg?: string | null;
   exp?: string | null;
-  batch?: string | null;
   household_id: string;
   created_at?: string;
   updated_at?: string;
