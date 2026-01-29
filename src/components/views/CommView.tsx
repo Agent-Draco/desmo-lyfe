@@ -1,0 +1,776 @@
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { MessageSquare, Users, Package, Send, Clock, CheckCircle, XCircle, ArrowLeft, Plus, Search, Filter, Box } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { vigilSupabase } from "@/integrations/vigil/client";
+
+interface Household {
+  id: string;
+  name: string;
+}
+
+interface CommViewProps {
+  household: Household | null;
+  currentUserId: string | null;
+  inventory?: any[];
+}
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  category?: string;
+  expiry_date?: string;
+  manufacturing_date?: string;
+  batch_number?: string;
+  status: "in" | "opened" | "out";
+}
+
+interface Listing {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  condition: string;
+  mode: "s-comm" | "b-comm";
+  status: "active" | "pending" | "completed" | "cancelled";
+  lister_id: string;
+  lister_name: string;
+  item_name?: string;
+  quantity?: number;
+  expiry_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Request {
+  id: string;
+  listing_id: string;
+  requester_id: string;
+  requester_name: string;
+  message: string;
+  status: "pending" | "accepted" | "rejected" | "cancelled";
+  created_at: string;
+}
+
+interface Chat {
+  id: string;
+  listing_id: string;
+  participant1_id: string;
+  participant2_id: string;
+  participant1_name: string;
+  participant2_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Message {
+  id: string;
+  chat_id: string;
+  sender_id: string;
+  sender_name: string;
+  content: string;
+  created_at: string;
+}
+
+export const CommView = ({ household, currentUserId, inventory = [] }: CommViewProps) => {
+  const [activeMode, setActiveMode] = useState<"s-comm" | "b-comm">("s-comm");
+  const [activeView, setActiveView] = useState<"browse" | "my-listings" | "requests" | "chat" | "inventory">("browse");
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const categories = ["all", "food", "clothing", "electronics", "books", "household", "other"];
+  const conditions = ["new", "like-new", "good", "fair", "poor"];
+
+  useEffect(() => {
+    fetchListings();
+    fetchRequests();
+    fetchChats();
+  }, [activeMode]);
+
+  useEffect(() => {
+    if (selectedChat) {
+      fetchMessages(selectedChat.id);
+    }
+  }, [selectedChat]);
+
+  const fetchListings = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await vigilSupabase
+        .from("listings")
+        .select("*")
+        .eq("mode", activeMode)
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setListings(data || []);
+    } catch (error) {
+      console.error("Error fetching listings:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRequests = async () => {
+    try {
+      const { data, error } = await vigilSupabase
+        .from("requests")
+        .select("*")
+        .or(`lister_id.eq.${currentUserId},requester_id.eq.${currentUserId}`)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (error) {
+      console.error("Error fetching requests:", error);
+    }
+  };
+
+  const fetchChats = async () => {
+    try {
+      const { data, error } = await vigilSupabase
+        .from("chats")
+        .select("*")
+        .or(`participant1_id.eq.${currentUserId},participant2_id.eq.${currentUserId}`)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      setChats(data || []);
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+    }
+  };
+
+  const fetchMessages = async (chatId: string) => {
+    try {
+      const { data, error } = await vigilSupabase
+        .from("messages")
+        .select("*")
+        .eq("chat_id", chatId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  };
+
+  const createListing = async (formData: any) => {
+    try {
+      const { data, error } = await vigilSupabase
+        .from("listings")
+        .insert({
+          ...formData,
+          mode: activeMode,
+          lister_id: currentUserId,
+          lister_name: household?.name || "Anonymous",
+          status: "active"
+        });
+
+      if (error) throw error;
+      setShowCreateForm(false);
+      fetchListings();
+    } catch (error) {
+      console.error("Error creating listing:", error);
+    }
+  };
+
+  const createRequest = async (listingId: string, message: string) => {
+    try {
+      const { data, error } = await vigilSupabase
+        .from("requests")
+        .insert({
+          listing_id: listingId,
+          requester_id: currentUserId,
+          requester_name: household?.name || "Anonymous",
+          message,
+          status: "pending"
+        });
+
+      if (error) throw error;
+      fetchRequests();
+    } catch (error) {
+      console.error("Error creating request:", error);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedChat) return;
+
+    try {
+      const { data, error } = await vigilSupabase
+        .from("messages")
+        .insert({
+          chat_id: selectedChat.id,
+          sender_id: currentUserId,
+          sender_name: household?.name || "Anonymous",
+          content: newMessage.trim()
+        });
+
+      if (error) throw error;
+      setNewMessage("");
+      fetchMessages(selectedChat.id);
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
+
+  const filteredListings = listings.filter(listing => {
+    const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         listing.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || listing.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="glass-card p-6">
+        <h1 className="text-2xl font-bold text-foreground mb-2">Community Marketplace</h1>
+        <p className="text-muted-foreground">Share and exchange items with your community</p>
+      </div>
+
+      {/* Mode Toggle */}
+      <div className="glass-card p-2">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setActiveMode("s-comm")}
+            className={cn(
+              "p-4 rounded-xl transition-all duration-300",
+              activeMode === "s-comm"
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Users className="w-6 h-6 mb-2 mx-auto" />
+            <div className="font-semibold">S-Comm</div>
+            <div className="text-xs opacity-75">Community Sharing</div>
+          </button>
+          <button
+            onClick={() => setActiveMode("b-comm")}
+            className={cn(
+              "p-4 rounded-xl transition-all duration-300",
+              activeMode === "b-comm"
+                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Package className="w-6 h-6 mb-2 mx-auto" />
+            <div className="font-semibold">B-Comm</div>
+            <div className="text-xs opacity-75">Secondary Market</div>
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="glass-card p-2">
+        <div className="grid grid-cols-5 gap-2">
+          {[
+            { id: "browse", label: "Browse", icon: Search },
+            { id: "inventory", label: "Inventory", icon: Box },
+            { id: "my-listings", label: "My Listings", icon: Package },
+            { id: "requests", label: "Requests", icon: Clock },
+            { id: "chat", label: "Chat", icon: MessageSquare }
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveView(id as any)}
+              className={cn(
+                "p-3 rounded-xl transition-all duration-300 flex flex-col items-center gap-1",
+                activeView === id
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-xs font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Browse View */}
+      <AnimatePresence mode="wait">
+        {activeView === "browse" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-4"
+          >
+            {/* Search and Filter */}
+            <div className="glass-card p-4 space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search listings..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {categories.map(category => (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-medium transition-all duration-300",
+                      selectedCategory === category
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background/50 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-purple-500 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
+              >
+                <Plus className="w-4 h-4 inline mr-2" />
+                Create Listing
+              </button>
+            </div>
+
+            {/* Listings Grid */}
+            <div className="grid gap-4">
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading listings...</div>
+              ) : filteredListings.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No listings found</div>
+              ) : (
+                filteredListings.map(listing => (
+                  <motion.div
+                    key={listing.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="glass-card p-4 space-y-3"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">{listing.title}</h3>
+                        <p className="text-sm text-muted-foreground">{listing.description}</p>
+                        <div className="flex gap-2 mt-2">
+                          <span className="text-xs px-2 py-1 bg-background/50 rounded-full">
+                            {listing.category}
+                          </span>
+                          <span className="text-xs px-2 py-1 bg-background/50 rounded-full">
+                            {listing.condition}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-muted-foreground">
+                          {listing.lister_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(listing.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => createRequest(listing.id, "I'm interested in this item")}
+                      className="w-full py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm font-medium"
+                    >
+                      Request Item
+                    </button>
+                  </motion.div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Chat View */}
+        {activeView === "chat" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="glass-card p-4"
+          >
+            {selectedChat ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 pb-4 border-b border-border/50">
+                  <button
+                    onClick={() => setSelectedChat(null)}
+                    className="p-2 hover:bg-background/50 rounded-lg transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <div>
+                    <div className="font-semibold">
+                      {selectedChat.participant1_id === currentUserId 
+                        ? selectedChat.participant2_name 
+                        : selectedChat.participant1_name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Active chat</div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {messages.map(message => (
+                    <div
+                      key={message.id}
+                      className={cn(
+                        "flex",
+                        message.sender_id === currentUserId ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-xs p-3 rounded-xl",
+                          message.sender_id === currentUserId
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-background/50"
+                        )}
+                      >
+                        <div className="text-sm">{message.content}</div>
+                        <div className="text-xs opacity-75 mt-1">
+                          {new Date(message.created_at).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Type a message..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                    className="flex-1 px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <button
+                    onClick={sendMessage}
+                    className="p-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-foreground">Active Chats</h3>
+                {chats.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No active chats</div>
+                ) : (
+                  chats.map(chat => (
+                    <button
+                      key={chat.id}
+                      onClick={() => setSelectedChat(chat)}
+                      className="w-full p-3 bg-background/50 rounded-xl hover:bg-background/70 transition-colors text-left"
+                    >
+                      <div className="font-medium">
+                        {chat.participant1_id === currentUserId 
+                          ? chat.participant2_name 
+                          : chat.participant1_name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Last active {new Date(chat.updated_at).toLocaleDateString()}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Inventory View */}
+        {activeView === "inventory" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-4"
+          >
+            <div className="glass-card p-4">
+              <h3 className="font-semibold text-foreground mb-4">Your Inventory Items</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Select items from your inventory to create marketplace listings
+              </p>
+              {inventory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No inventory items available. Add items to your inventory first.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {inventory.filter(item => item.status !== 'out').map(item => (
+                    <div key={item.id} className="p-3 bg-background/50 rounded-xl">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {item.category && `Category: ${item.category}`}
+                            {item.expiry_date && ` • Expires: ${new Date(item.expiry_date).toLocaleDateString()}`}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Status: {item.status}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedInventoryItem(item);
+                            setShowCreateForm(true);
+                          }}
+                          className="px-3 py-1 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors text-sm font-medium"
+                        >
+                          List Item
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Requests View */}
+        {activeView === "requests" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-4"
+          >
+            <div className="glass-card p-4">
+              <h3 className="font-semibold text-foreground mb-4">Your Requests</h3>
+              {requests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No requests yet</div>
+              ) : (
+                <div className="space-y-3">
+                  {requests.map(request => (
+                    <div key={request.id} className="p-3 bg-background/50 rounded-xl">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium">{request.requester_name}</div>
+                          <div className="text-sm text-muted-foreground">{request.message}</div>
+                        </div>
+                        <div className={cn(
+                          "px-2 py-1 rounded-full text-xs font-medium",
+                          request.status === "pending" && "bg-yellow-500/20 text-yellow-400",
+                          request.status === "accepted" && "bg-emerald-500/20 text-emerald-400",
+                          request.status === "rejected" && "bg-red-500/20 text-red-400"
+                        )}>
+                          {request.status}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* My Listings View */}
+        {activeView === "my-listings" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-4"
+          >
+            <div className="glass-card p-4">
+              <h3 className="font-semibold text-foreground mb-4">Your Listings</h3>
+              <div className="text-center py-8 text-muted-foreground">
+                Your listings will appear here
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Listing Modal */}
+      <AnimatePresence>
+        {showCreateForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowCreateForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card p-6 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold text-foreground mb-4">Create Listing</h3>
+              <CreateListingForm
+                onSubmit={createListing}
+                onCancel={() => {
+                  setShowCreateForm(false);
+                  setSelectedInventoryItem(null);
+                }}
+                categories={categories.filter(c => c !== "all")}
+                conditions={conditions}
+                prefillData={selectedInventoryItem ? {
+                  title: selectedInventoryItem.name,
+                  description: `Listing ${selectedInventoryItem.name} from inventory`,
+                  item_name: selectedInventoryItem.name,
+                  category: selectedInventoryItem.category || "other",
+                  expiry_date: selectedInventoryItem.expiry_date || ""
+                } : undefined}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+interface CreateListingFormProps {
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+  categories: string[];
+  conditions: string[];
+  prefillData?: {
+    title?: string;
+    description?: string;
+    item_name?: string;
+    category?: string;
+    expiry_date?: string;
+  };
+}
+
+const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, prefillData }: CreateListingFormProps) => {
+  const [formData, setFormData] = useState({
+    title: prefillData?.title || "",
+    description: prefillData?.description || "",
+    category: prefillData?.category || categories[0],
+    condition: conditions[0],
+    item_name: prefillData?.item_name || "",
+    quantity: 1,
+    expiry_date: prefillData?.expiry_date || ""
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Title</label>
+        <input
+          type="text"
+          required
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+        <textarea
+          required
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+          rows={3}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Category</label>
+          <select
+            value={formData.category}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            {categories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Condition</label>
+          <select
+            value={formData.condition}
+            onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
+            className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            {conditions.map(condition => (
+              <option key={condition} value={condition}>{condition}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Item Name</label>
+          <input
+            type="text"
+            value={formData.item_name}
+            onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+            className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Quantity</label>
+          <input
+            type="number"
+            min="1"
+            value={formData.quantity}
+            onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+            className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Expiry Date (optional)</label>
+        <input
+          type="date"
+          value={formData.expiry_date}
+          onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+          className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 py-2 bg-background/50 text-foreground rounded-xl hover:bg-background/70 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="flex-1 py-2 bg-gradient-to-r from-emerald-500 to-purple-500 text-white rounded-xl hover:opacity-90 transition-opacity"
+        >
+          Create Listing
+        </button>
+      </div>
+    </form>
+  );
+};
