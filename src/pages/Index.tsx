@@ -13,6 +13,7 @@ import { ScanView } from "@/components/views/ScanView";
 import { FamilyView } from "@/components/views/FamilyView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { CommView } from "@/components/views/CommView";
+import { NudgesView } from "@/components/views/NudgesView";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useInventory } from "@/hooks/useInventory";
@@ -205,6 +206,8 @@ const Index = () => {
         return <ScanView onAddItem={handleAddItem} />;
       case "family":
         return <FamilyView household={household} currentUserId={user?.id || null} />;
+      case "nudges":
+        return <NudgesView inventory={inventory} />;
       case "comm":
         return <CommView household={household} currentUserId={user?.id || null} inventory={inventory} />;
       case "settings":

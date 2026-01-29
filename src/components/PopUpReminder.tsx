@@ -3,6 +3,24 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Clock, CheckCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const POPUP_HANDLED_KEY = "desmo_popup_handled_item_ids";
+
+const getHandledSet = () => {
+  try {
+    const raw = localStorage.getItem(POPUP_HANDLED_KEY);
+    const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+    return new Set(parsed);
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const persistHandled = (id: string) => {
+  const set = getHandledSet();
+  set.add(id);
+  localStorage.setItem(POPUP_HANDLED_KEY, JSON.stringify(Array.from(set)));
+};
+
 interface ExpiringItem {
   id: string;
   name: string;
@@ -26,17 +44,22 @@ export const PopUpReminder = ({
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
 
+  const visibleItems = (() => {
+    const handled = getHandledSet();
+    return expiringItems.filter((it) => !handled.has(it.id));
+  })();
+
   useEffect(() => {
-    if (isVisible && expiringItems.length > 0) {
+    if (isVisible && visibleItems.length > 0) {
       setCurrentItemIndex(0);
       setAddedItems(new Set());
     }
-  }, [isVisible, expiringItems.length]);
+  }, [isVisible, visibleItems.length]);
 
-  const currentItem = expiringItems[currentItemIndex];
+  const currentItem = visibleItems[currentItemIndex];
 
   const handleNext = () => {
-    if (currentItemIndex < expiringItems.length - 1) {
+    if (currentItemIndex < visibleItems.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1);
     } else {
       onDismiss();
@@ -45,12 +68,21 @@ export const PopUpReminder = ({
 
   const handleAddToList = () => {
     onAddToShoppingList(currentItem.name);
+    persistHandled(currentItem.id);
     setAddedItems(prev => new Set(prev).add(currentItem.id));
     handleNext();
   };
 
   const handleSkip = () => {
     handleNext();
+  };
+
+  const handleDismissAll = () => {
+    // Dismiss is considered an action (per TODO text). Skips are not persisted.
+    for (let idx = currentItemIndex; idx < visibleItems.length; idx++) {
+      persistHandled(visibleItems[idx].id);
+    }
+    onDismiss();
   };
 
   if (!isVisible || !currentItem) return null;
@@ -93,8 +125,8 @@ export const PopUpReminder = ({
                   {isExpired ? "Item Expired!" : "Expiring Soon!"}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {expiringItems.length > 1 ? (
-                    `Item ${currentItemIndex + 1} of ${expiringItems.length}`
+                  {visibleItems.length > 1 ? (
+                    `Item ${currentItemIndex + 1} of ${visibleItems.length}`
                   ) : (
                     "Review this item"
                   )}
@@ -152,7 +184,7 @@ export const PopUpReminder = ({
               >
                 Skip
               </Button>
-              {expiringItems.length > 1 && currentItemIndex < expiringItems.length - 1 && (
+              {visibleItems.length > 1 && currentItemIndex < visibleItems.length - 1 && (
                 <Button
                   variant="outline"
                   onClick={handleNext}
@@ -163,27 +195,27 @@ export const PopUpReminder = ({
               )}
             </div>
 
-            {expiringItems.length > 1 && (
+            {visibleItems.length > 1 && (
               <Button
                 variant="ghost"
-                onClick={onDismiss}
+                onClick={handleDismissAll}
                 className="w-full text-muted-foreground hover:text-foreground"
               >
-                Dismiss All ({expiringItems.length - currentItemIndex} remaining)
+                Dismiss All ({visibleItems.length - currentItemIndex} remaining)
               </Button>
             )}
 
             {/* Progress dots */}
-            {expiringItems.length > 1 && (
+            {visibleItems.length > 1 && (
               <div className="flex justify-center gap-1.5 pt-2">
-                {expiringItems.map((_, idx) => (
+                {visibleItems.map((_, idx) => (
                   <div
                     key={idx}
                     className={`w-2 h-2 rounded-full transition-colors ${
                       idx === currentItemIndex 
                         ? 'bg-primary' 
                         : idx < currentItemIndex 
-                          ? addedItems.has(expiringItems[idx].id) 
+                          ? addedItems.has(visibleItems[idx].id) 
                             ? 'bg-success' 
                             : 'bg-muted-foreground/30'
                           : 'bg-muted-foreground/20'

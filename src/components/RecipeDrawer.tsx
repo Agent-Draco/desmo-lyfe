@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, ChefHat, Clock, Users, ExternalLink } from "lucide-react";
 import { GlassCard } from "./GlassCard";
 import { findRecipesByIngredients } from "@/lib/spoonacular";
+import { useAuth } from "@/hooks/useAuth";
+import { useSpoonSureProfile } from "@/hooks/useSpoonSureProfile";
 import { cn } from "@/lib/utils";
 
 interface Recipe {
@@ -45,16 +47,22 @@ export const RecipeDrawer = ({ isOpen, onClose, ingredient }: RecipeDrawerProps)
   const [loading, setLoading] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
+  const { user } = useAuth();
+  const { profile } = useSpoonSureProfile(user?.id ?? null);
+
   useEffect(() => {
     if (isOpen && ingredient) {
       fetchRecipes();
     }
-  }, [isOpen, ingredient]);
+  }, [isOpen, ingredient, profile?.diet, profile?.allergies]);
 
   const fetchRecipes = async () => {
     setLoading(true);
     try {
-      const fetchedRecipes = await findRecipesByIngredients([ingredient]);
+      const fetchedRecipes = await findRecipesByIngredients([ingredient], {
+        diet: profile?.diet ?? null,
+        intolerances: profile?.allergies ?? [],
+      });
       setRecipes(fetchedRecipes);
     } catch (error) {
       console.error('Error fetching recipes:', error);

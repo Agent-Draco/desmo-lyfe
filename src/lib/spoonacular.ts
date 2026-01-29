@@ -1,5 +1,5 @@
 // Spoonacular API integration for recipe suggestions
-const SPOONACULAR_API_KEY = 'c215a07fd1a942f39c156779f2f59894';
+const SPOONACULAR_API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY as string | undefined;
 const SPOONACULAR_BASE_URL = 'https://api.spoonacular.com';
 
 export interface Recipe {
@@ -32,15 +32,38 @@ export interface Recipe {
   }>;
 }
 
+export interface SpoonacularPreferences {
+  diet?: string | null;
+  intolerances?: string[];
+}
+
 /**
  * Find recipes by ingredients using Spoonacular API
  */
-export async function findRecipesByIngredients(ingredients: string[]): Promise<Recipe[]> {
+export async function findRecipesByIngredients(
+  ingredients: string[],
+  preferences?: SpoonacularPreferences,
+): Promise<Recipe[]> {
   try {
+    if (!SPOONACULAR_API_KEY) {
+      console.error("Missing Spoonacular API key: set VITE_SPOONACULAR_API_KEY");
+      return [];
+    }
     const ingredientsQuery = ingredients.join(',');
-    const url = `${SPOONACULAR_BASE_URL}/recipes/findByIngredients?apiKey=${SPOONACULAR_API_KEY}&ingredients=${encodeURIComponent(ingredientsQuery)}&number=5&ranking=1`;
 
-    const response = await fetch(url);
+    const url = new URL(`${SPOONACULAR_BASE_URL}/recipes/findByIngredients`);
+    url.searchParams.set("apiKey", SPOONACULAR_API_KEY);
+    url.searchParams.set("ingredients", ingredientsQuery);
+    url.searchParams.set("number", "5");
+    url.searchParams.set("ranking", "1");
+
+    const diet = preferences?.diet?.trim();
+    if (diet) url.searchParams.set("diet", diet);
+
+    const intolerances = (preferences?.intolerances ?? []).map((s) => s.trim()).filter(Boolean);
+    if (intolerances.length) url.searchParams.set("intolerances", intolerances.join(","));
+
+    const response = await fetch(url.toString());
     if (!response.ok) {
       throw new Error(`Spoonacular API error: ${response.status}`);
     }
@@ -77,6 +100,10 @@ export async function findRecipesByIngredients(ingredients: string[]): Promise<R
  */
 export async function getRecipeInformation(recipeId: number): Promise<Recipe | null> {
   try {
+    if (!SPOONACULAR_API_KEY) {
+      console.error("Missing Spoonacular API key: set VITE_SPOONACULAR_API_KEY");
+      return null;
+    }
     const url = `${SPOONACULAR_BASE_URL}/recipes/${recipeId}/information?apiKey=${SPOONACULAR_API_KEY}`;
 
     const response = await fetch(url);

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import type { FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Keyboard, Barcode, X, Loader2, Check } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
@@ -9,12 +10,14 @@ import jsQR from "jsqr";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
+const PHOTO_SCAN_BETA = import.meta.env.VITE_PHOTO_SCAN_BETA === "true";
+
 interface ScanViewProps {
   onAddItem: (item: { name: string; barcode?: string; quantity?: number; unit?: string; exp?: string; mfg?: string; batch?: string }) => Promise<any>;
 }
 
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
-  const [mode, setMode] = useState<"choice" | "scan" | "manual">("choice");
+  const [mode, setMode] = useState<"choice" | "scan" | "manual" | "photo">("choice");
   const [manualName, setManualName] = useState("");
   const [manualQuantity, setManualQuantity] = useState("1");
   const [manualUnit, setManualUnit] = useState("pcs");
@@ -22,6 +25,8 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [manualBatchNumber, setManualBatchNumber] = useState("");
   const [manualExpiryDate, setManualExpiryDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ocrText, setOcrText] = useState<string>("");
+  const [photoResult, setPhotoResult] = useState<{ name: string; mfg?: string; exp?: string; batch?: string } | null>(null);
   const [scannedProduct, setScannedProduct] = useState<{
     name: string;
     barcode: string;
@@ -30,6 +35,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const { videoRef, lookupBarcode, startScanning, stopScanning } = useBarcodeScanner();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scanIntervalRef = useRef<number | null>(null);
+  const photoIntervalRef = useRef<number | null>(null);
   const lastScannedRef = useRef<string | null>(null);
   const scanCountRef = useRef<Map<string, number>>(new Map());
 
@@ -41,18 +47,18 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     async (barcode: string) => {
       // Prevent duplicate scans
       if (lastScannedRef.current === barcode) return;
-      
+
       // Require multiple consistent reads for accuracy
       const count = (scanCountRef.current.get(barcode) || 0) + 1;
       scanCountRef.current.set(barcode, count);
-      
+
       // Only accept after 3 consistent reads
       if (count < 3) return;
-      
+
       lastScannedRef.current = barcode;
       setLoading(true);
       stopScanning();
-      
+
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
         scanIntervalRef.current = null;
@@ -167,6 +173,65 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     }
   }, [videoRef, handleBarcodeDetected]);
 
+  const extractDatesAndBatch = (text: string) => {
+    const normalized = text.replace(/\s+/g, " ").trim();
+
+    const dateLike = (label: string) => {
+      const re = new RegExp(`${label}[^0-9]*(\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2})`, "i");
+      const m = normalized.match(re);
+      if (m?.[1]) {
+        return m[1].replace(/\./g, "-").replace(/\//g, "-");
+      }
+      return undefined;
+    };
+
+    const exp = dateLike("(exp|expiry|expires)");
+    const mfg = dateLike("(mfg|mfd|manufactured)");
+
+    const batchMatch = normalized.match(/(batch|lot)\s*[:#-]?\s*([A-Z0-9-]{3,})/i);
+    const batch = batchMatch?.[2] || undefined;
+
+    return { exp, mfg, batch };
+  };
+
+  const runPhotoOcrOnce = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    setLoading(true);
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
+      const { data } = await worker.recognize(canvas);
+      await worker.terminate();
+
+      const text = data?.text ?? "";
+      setOcrText(text);
+
+      const extracted = extractDatesAndBatch(text);
+      setPhotoResult({
+        name: manualName.trim() || "Scanned Item",
+        mfg: extracted.mfg,
+        exp: extracted.exp,
+        batch: extracted.batch,
+      });
+    } catch (err) {
+      console.error("Photo OCR failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [manualName, videoRef]);
+
   const startJsQRScanner = useCallback(async () => {
     try {
       await startScanning();
@@ -189,14 +254,29 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
       startJsQRScanner();
     }
 
+    if (mode === "photo") {
+      void startScanning();
+      setOcrText("");
+      setPhotoResult(null);
+
+      photoIntervalRef.current = window.setInterval(() => {
+        void runPhotoOcrOnce();
+      }, 5000);
+    }
+
     return () => {
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
         scanIntervalRef.current = null;
       }
+
+      if (photoIntervalRef.current) {
+        clearInterval(photoIntervalRef.current);
+        photoIntervalRef.current = null;
+      }
       stopScanning();
     };
-  }, [mode, scannedProduct, startJsQRScanner, stopScanning]);
+  }, [mode, scannedProduct, startJsQRScanner, stopScanning, startScanning, runPhotoOcrOnce]);
 
   const handleAddScannedProduct = async () => {
     if (!scannedProduct) return;
@@ -213,7 +293,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     setLoading(false);
   };
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
+  const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!manualName.trim() || !manualMfgDate.trim() || !manualExpiryDate.trim()) return;
 
@@ -226,6 +306,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
       batch: manualBatchNumber.trim() || "-",
       exp: manualExpiryDate.trim(),
     });
+
     setManualName("");
     setManualQuantity("1");
     setManualUnit("pcs");
@@ -241,6 +322,10 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
       clearInterval(scanIntervalRef.current);
       scanIntervalRef.current = null;
     }
+    if (photoIntervalRef.current) {
+      clearInterval(photoIntervalRef.current);
+      photoIntervalRef.current = null;
+    }
     stopScanning();
     lastScannedRef.current = null;
     scanCountRef.current.clear();
@@ -251,7 +336,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     <section className="flex flex-col items-center justify-center min-h-[60vh]">
       {/* Hidden canvas for image processing */}
       <canvas ref={canvasRef} className="hidden" />
-      
+
       <AnimatePresence mode="wait">
         {mode === "choice" && (
           <motion.div
@@ -295,7 +380,144 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
                   <p className="text-sm text-muted-foreground">Add item details by hand</p>
                 </div>
               </GlassCard>
+
+              {PHOTO_SCAN_BETA && (
+                <GlassCard
+                  onClick={() => setMode("photo")}
+                  className="flex items-center gap-4 cursor-pointer"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
+                    <Camera className="w-6 h-6 text-destructive" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Photo Scan (Beta)</h3>
+                    <p className="text-sm text-muted-foreground">Captures a photo every 5s and extracts dates</p>
+                  </div>
+                </GlassCard>
+              )}
             </div>
+          </motion.div>
+        )}
+
+        {mode === "photo" && (
+          <motion.div
+            key="photo"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="w-full max-w-sm mx-auto"
+          >
+            <div className="relative">
+              <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                  autoPlay
+                />
+              </div>
+
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              )}
+
+              <button
+                onClick={handleCloseScanner}
+                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <GlassCard className="p-4 mt-4">
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="photoName">Item name</Label>
+                  <Input
+                    id="photoName"
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    placeholder="Type item name (OCR doesn’t reliably detect names yet)"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="photoMfg">Mfg</Label>
+                    <Input
+                      id="photoMfg"
+                      value={photoResult?.mfg ?? ""}
+                      onChange={(e) => setPhotoResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), mfg: e.target.value }))}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="photoExp">Exp</Label>
+                    <Input
+                      id="photoExp"
+                      value={photoResult?.exp ?? ""}
+                      onChange={(e) => setPhotoResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), exp: e.target.value }))}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="photoBatch">Batch</Label>
+                  <Input
+                    id="photoBatch"
+                    value={photoResult?.batch ?? ""}
+                    onChange={(e) => setPhotoResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), batch: e.target.value }))}
+                    placeholder="Batch / Lot"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void runPhotoOcrOnce()}
+                    className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
+                  >
+                    Re-scan
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={async () => {
+                      const name = manualName.trim();
+                      if (!name) return;
+                      setLoading(true);
+                      await onAddItem({
+                        name,
+                        mfg: photoResult?.mfg,
+                        exp: photoResult?.exp,
+                        batch: photoResult?.batch || "-",
+                      });
+                      setLoading(false);
+                      setMode("choice");
+                      setManualName("");
+                      setPhotoResult(null);
+                      setOcrText("");
+                    }}
+                    disabled={loading}
+                    className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Add Item"}
+                  </motion.button>
+                </div>
+
+                {ocrText && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">OCR text</summary>
+                    <pre className="mt-2 whitespace-pre-wrap">{ocrText}</pre>
+                  </details>
+                )}
+              </div>
+            </GlassCard>
           </motion.div>
         )}
 

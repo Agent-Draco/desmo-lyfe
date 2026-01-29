@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Package, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { StatsCard } from "@/components/StatsCard";
 import { QuickAddPreset, quickAddPresets } from "@/components/QuickAddPreset";
 import { InventoryItem } from "@/components/InventoryItem";
 import { ShoppingListWidget } from "@/components/ShoppingListWidget";
+import { RecipeDrawer } from "@/components/RecipeDrawer";
 import { AnimatePresence } from "framer-motion";
 import type { InventoryItem as InventoryItemType } from "@/hooks/useInventory";
 import type { ShoppingListItem } from "@/hooks/useShoppingList";
@@ -27,6 +29,9 @@ export const HomeView = ({
   shoppingListLoading,
   loading 
 }: HomeViewProps) => {
+  const [isRecipeOpen, setIsRecipeOpen] = useState(false);
+  const [recipeIngredient, setRecipeIngredient] = useState("");
+
   const expiringCount = inventory.filter((item) => {
     if (!item.expiry_date) return false;
     const days = Math.ceil(
@@ -96,13 +101,14 @@ export const HomeView = ({
         
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
           {quickAddPresets.map((preset, i) => (
-            <QuickAddPreset
-              key={preset.name}
-              name={preset.name}
-              emoji={preset.emoji}
-              onClick={() => onQuickAdd(preset.name)}
-              delay={0.3 + i * 0.05}
-            />
+            <div key={preset.name}>
+              <QuickAddPreset
+                name={preset.name}
+                emoji={preset.emoji}
+                onClick={() => onQuickAdd(preset.name)}
+                delay={0.3 + i * 0.05}
+              />
+            </div>
           ))}
         </div>
       </section>
@@ -140,24 +146,35 @@ export const HomeView = ({
           <div className="space-y-3">
             <AnimatePresence>
               {inventory.slice(0, 5).map((item, i) => (
-                <InventoryItem
-                  key={item.id}
-                  name={item.name}
-                  quantity={item.quantity}
-                  expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
-                  mfgDate={item.mfg_date ? new Date(item.mfg_date) : undefined}
-                  batch={item.batch}
-                  category={item.category}
-                  isInStock={!item.is_out}
-                  createdAt={new Date(item.created_at)}
-                  onClick={() => onItemClick(item.id)}
-                  delay={0.5 + i * 0.1}
-                />
+                <div key={item.id}>
+                  <InventoryItem
+                    name={item.name}
+                    quantity={item.quantity}
+                    expiryDate={item.expiry_date ? new Date(item.expiry_date) : undefined}
+                    mfgDate={item.mfg_date ? new Date(item.mfg_date) : undefined}
+                    batch={item.batch}
+                    category={item.category}
+                    isInStock={!item.is_out}
+                    createdAt={new Date(item.created_at)}
+                    onClick={() => onItemClick(item.id)}
+                    onRescueMission={() => {
+                      setRecipeIngredient(item.name);
+                      setIsRecipeOpen(true);
+                    }}
+                    delay={0.5 + i * 0.1}
+                  />
+                </div>
               ))}
             </AnimatePresence>
           </div>
         )}
       </section>
+
+      <RecipeDrawer
+        isOpen={isRecipeOpen}
+        onClose={() => setIsRecipeOpen(false)}
+        ingredient={recipeIngredient}
+      />
     </>
   );
 };

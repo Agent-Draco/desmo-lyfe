@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { FormEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,9 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
+import asteriskLogo from "@/assets/asterisk.png";
 import { z } from "zod";
+
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -29,6 +33,7 @@ const Auth = () => {
   const {
     toast
   } = useToast();
+
   useEffect(() => {
     const {
       data: {
@@ -63,6 +68,7 @@ const Auth = () => {
       setRememberMe(true);
     }
   }, []);
+
   const validate = () => {
     const newErrors: typeof errors = {};
     const emailResult = emailSchema.safeParse(email);
@@ -79,7 +85,8 @@ const Auth = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  const handleSubmit = async (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
@@ -133,6 +140,7 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
   const handleSocialLogin = async (provider: "google" | "azure") => {
     setSocialLoading(provider);
     try {
@@ -154,6 +162,7 @@ const Auth = () => {
       setSocialLoading(null);
     }
   };
+
   return <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <motion.div initial={{
       opacity: 0,
@@ -163,18 +172,11 @@ const Auth = () => {
       y: 0
     }} className="w-full max-w-md">
         <div className="text-center mb-8">
-          <motion.div initial={{
-          scale: 0.8
-        }} animate={{
-          scale: 1
-        }} transition={{
-          type: "spring",
-          duration: 0.6
-        }} className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center">
-            <span className="text-4xl">🥗</span>
-          </motion.div>
-          <h1 className="text-3xl font-bold text-foreground">AsteRISK</h1>
-          <p className="text-muted-foreground mt-2">Family Kitchen Inventory</p>
+          <img
+            src={asteriskLogo}
+            alt="AsteRISK"
+            className="w-24 h-24 mx-auto mb-2 object-contain"
+          />
         </div>
 
         <GlassCard className="p-6">

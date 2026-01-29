@@ -22,6 +22,7 @@ interface InventoryItemProps {
   onClick?: () => void;
   onOpen?: () => void;
   onTap?: () => void;
+  onRescueMission?: () => void;
   delay?: number;
 }
 
@@ -38,10 +39,16 @@ export const InventoryItem = ({
   onClick,
   onOpen,
   onTap,
+  onRescueMission,
   delay = 0
 }: InventoryItemProps) => {
   const visualState = getVisualStateConfig(state || getItemState(expiryDate));
   const isExpiring = visualState.variant === 'warning' || visualState.variant === 'destructive';
+
+  const computedState = state || getItemState(expiryDate);
+  const isAtRisk = computedState === 'critical' || computedState === 'expired';
+  const isFood = (category || '').toLowerCase().includes('food');
+  const showRescueMission = Boolean(onRescueMission) && isFood && isAtRisk;
 
   const getCategoryIcon = (categoryName?: string | null) => {
     if (!categoryName) return Package;
@@ -168,6 +175,22 @@ export const InventoryItem = ({
               <span className="text-xs text-muted-foreground capitalize">
                 {state.toLowerCase()}
               </span>
+            </div>
+          )}
+
+          {showRescueMission && (
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRescueMission?.();
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors text-xs font-semibold"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                Start Rescue Mission
+              </button>
             </div>
           )}
         </div>

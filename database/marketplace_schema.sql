@@ -66,77 +66,27 @@ CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 
 -- Row Level Security (RLS) policies
-ALTER TABLE listings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE listings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE requests DISABLE ROW LEVEL SECURITY;
+ALTER TABLE chats DISABLE ROW LEVEL SECURITY;
+ALTER TABLE messages DISABLE ROW LEVEL SECURITY;
 
--- Listings policies
-CREATE POLICY "Anyone can view active listings" ON listings
-    FOR SELECT USING (status = 'active');
+DROP POLICY IF EXISTS "Anyone can view active listings" ON listings;
+DROP POLICY IF EXISTS "Users can view own listings" ON listings;
+DROP POLICY IF EXISTS "Users can insert own listings" ON listings;
+DROP POLICY IF EXISTS "Users can update own listings" ON listings;
+DROP POLICY IF EXISTS "Users can delete own listings" ON listings;
 
-CREATE POLICY "Users can view own listings" ON listings
-    FOR SELECT USING (auth.uid()::text = lister_id);
+DROP POLICY IF EXISTS "Users can view own requests" ON requests;
+DROP POLICY IF EXISTS "Users can insert requests" ON requests;
+DROP POLICY IF EXISTS "Users can update own requests" ON requests;
 
-CREATE POLICY "Users can insert own listings" ON listings
-    FOR INSERT WITH CHECK (auth.uid()::text = lister_id);
+DROP POLICY IF EXISTS "Users can view own chats" ON chats;
+DROP POLICY IF EXISTS "Users can insert chats" ON chats;
+DROP POLICY IF EXISTS "Users can update own chats" ON chats;
 
-CREATE POLICY "Users can update own listings" ON listings
-    FOR UPDATE USING (auth.uid()::text = lister_id);
-
-CREATE POLICY "Users can delete own listings" ON listings
-    FOR DELETE USING (auth.uid()::text = lister_id);
-
--- Requests policies
-CREATE POLICY "Users can view own requests" ON requests
-    FOR SELECT USING (
-        auth.uid()::text = requester_id OR
-        auth.uid()::text = (SELECT lister_id FROM listings WHERE id = listing_id)
-    );
-
-CREATE POLICY "Users can insert requests" ON requests
-    FOR INSERT WITH CHECK (auth.uid()::text = requester_id);
-
-CREATE POLICY "Users can update own requests" ON requests
-    FOR UPDATE USING (auth.uid()::text = requester_id);
-
--- Chats policies
-CREATE POLICY "Users can view own chats" ON chats
-    FOR SELECT USING (
-        auth.uid()::text = participant1_id OR
-        auth.uid()::text = participant2_id
-    );
-
-CREATE POLICY "Users can insert chats" ON chats
-    FOR INSERT WITH CHECK (
-        auth.uid()::text = participant1_id OR
-        auth.uid()::text = participant2_id
-    );
-
-CREATE POLICY "Users can update own chats" ON chats
-    FOR UPDATE USING (
-        auth.uid()::text = participant1_id OR
-        auth.uid()::text = participant2_id
-    );
-
--- Messages policies
-CREATE POLICY "Users can view messages in own chats" ON messages
-    FOR SELECT USING (
-        auth.uid()::text IN (
-            SELECT participant1_id FROM chats WHERE id = chat_id
-            UNION
-            SELECT participant2_id FROM chats WHERE id = chat_id
-        )
-    );
-
-CREATE POLICY "Users can insert messages in own chats" ON messages
-    FOR INSERT WITH CHECK (
-        auth.uid()::text IN (
-            SELECT participant1_id FROM chats WHERE id = chat_id
-            UNION
-            SELECT participant2_id FROM chats WHERE id = chat_id
-        )
-    );
+DROP POLICY IF EXISTS "Users can view messages in own chats" ON messages;
+DROP POLICY IF EXISTS "Users can insert messages in own chats" ON messages;
 
 -- Functions to automatically update updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
