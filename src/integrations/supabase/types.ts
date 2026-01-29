@@ -45,6 +45,15 @@ export type Database = {
           household_id: string
           id: string
           is_out: boolean
+          item_type: string
+          medicine_dose_amount: number | null
+          medicine_dose_times: string[] | null
+          medicine_dose_unit: string | null
+          medicine_is_dosaged: boolean
+          medicine_last_taken_at: string | null
+          medicine_next_dose_at: string | null
+          medicine_snooze_until: string | null
+          medicine_timezone: string | null
           name: string
           quantity: number
           unit: string | null
@@ -59,6 +68,15 @@ export type Database = {
           household_id: string
           id?: string
           is_out?: boolean
+          item_type?: string
+          medicine_dose_amount?: number | null
+          medicine_dose_times?: string[] | null
+          medicine_dose_unit?: string | null
+          medicine_is_dosaged?: boolean
+          medicine_last_taken_at?: string | null
+          medicine_next_dose_at?: string | null
+          medicine_snooze_until?: string | null
+          medicine_timezone?: string | null
           name: string
           quantity?: number
           unit?: string | null
@@ -73,6 +91,15 @@ export type Database = {
           household_id?: string
           id?: string
           is_out?: boolean
+          item_type?: string
+          medicine_dose_amount?: number | null
+          medicine_dose_times?: string[] | null
+          medicine_dose_unit?: string | null
+          medicine_is_dosaged?: boolean
+          medicine_last_taken_at?: string | null
+          medicine_next_dose_at?: string | null
+          medicine_snooze_until?: string | null
+          medicine_timezone?: string | null
           name?: string
           quantity?: number
           unit?: string | null

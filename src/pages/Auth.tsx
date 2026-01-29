@@ -175,7 +175,7 @@ const Auth = () => {
           <img
             src={asteriskLogo}
             alt="AsteRISK"
-            className="w-24 h-24 mx-auto mb-2 object-contain"
+            className="w-72 h-72 mx-auto mb-2 object-contain"
           />
         </div>
 

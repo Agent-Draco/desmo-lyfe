@@ -6,6 +6,7 @@ import { GlassNav } from "@/components/GlassNav";
 import { RemovalModeToggle } from "@/components/RemovalModeToggle";
 import { SuccessFlash } from "@/components/SuccessFlash";
 import { PopUpReminder } from "@/components/PopUpReminder";
+import { MedicineDoseReminder } from "@/components/MedicineDoseReminder";
 import { HomeView } from "@/components/views/HomeView";
 import { InventoryView } from "@/components/views/InventoryView";
 import { ShoppingListView } from "@/components/views/ShoppingListView";
@@ -28,10 +29,11 @@ const Index = () => {
   const [showFlash, setShowFlash] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
   const [expiringItems, setExpiringItems] = useState([]);
+  const [dueMedicineId, setDueMedicineId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const { user, profile, household, loading: authLoading, signOut, hasHousehold } = useAuth();
-  const { items: inventory, loading: inventoryLoading, addItem, deleteItem } = useInventory(household?.id || null);
+  const { items: inventory, loading: inventoryLoading, addItem, deleteItem, updateItem, decrementItem } = useInventory(household?.id || null);
   const { items: shoppingList, loading: shoppingListLoading, addItem: addShoppingItem, deleteItem: deleteShoppingItem } = useShoppingList(household?.id || null);
 
   // Enable expiry notifications - cast to any to bypass type checking between different inventory formats
@@ -138,13 +140,33 @@ const Index = () => {
     });
   };
 
-  const handleAddItem = async (item: { name: string; barcode?: string; exp?: string; mfg?: string; batch?: string }) => {
+  const handleAddItem = async (item: {
+    name: string;
+    barcode?: string;
+    exp?: string;
+    mfg?: string;
+    batch?: string;
+    item_type?: "food" | "medicine";
+    medicine_is_dosaged?: boolean;
+    medicine_dose_amount?: number;
+    medicine_dose_unit?: string;
+    medicine_dose_times?: string[];
+    medicine_timezone?: string;
+    medicine_next_dose_at?: string;
+  }) => {
     const result = await addItem({
       name: item.name,
       barcode: item.barcode,
       expiry_date: item.exp,
       manufacturing_date: item.mfg,
       batch_number: item.batch,
+      item_type: item.item_type,
+      medicine_is_dosaged: item.medicine_is_dosaged,
+      medicine_dose_amount: item.medicine_dose_amount,
+      medicine_dose_unit: item.medicine_dose_unit,
+      medicine_dose_times: item.medicine_dose_times,
+      medicine_timezone: item.medicine_timezone,
+      medicine_next_dose_at: item.medicine_next_dose_at,
     });
 
     // Remove from shopping list if item was successfully added to inventory
@@ -157,6 +179,64 @@ const Index = () => {
 
     return result;
   };
+
+  const computeNextDoseAt = (times: string[] | null | undefined, now = new Date()) => {
+    if (!times || times.length === 0) return null;
+    const sorted = [...times].sort();
+
+    for (const t of sorted) {
+      const [hhRaw, mmRaw] = t.split(":");
+      const hh = parseInt(hhRaw, 10);
+      const mm = parseInt(mmRaw, 10);
+      if (Number.isNaN(hh) || Number.isNaN(mm)) continue;
+
+      const candidate = new Date(now);
+      candidate.setSeconds(0, 0);
+      candidate.setHours(hh, mm, 0, 0);
+      if (candidate.getTime() > now.getTime()) return candidate.toISOString();
+    }
+
+    const [hhRaw, mmRaw] = sorted[0].split(":");
+    const hh = parseInt(hhRaw, 10);
+    const mm = parseInt(mmRaw, 10);
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+
+    const next = new Date(now);
+    next.setDate(now.getDate() + 1);
+    next.setSeconds(0, 0);
+    next.setHours(hh, mm, 0, 0);
+    return next.toISOString();
+  };
+
+  // Detect due dosaged medicines and show reminder.
+  useEffect(() => {
+    if (dueMedicineId) return;
+    if (!inventory || inventory.length === 0) return;
+
+    const now = new Date();
+
+    const due = inventory.find((it: any) => {
+      if (it.is_out) return false;
+      if (it.item_type !== "medicine") return false;
+      if (!it.medicine_is_dosaged) return false;
+      if (!it.medicine_next_dose_at) return false;
+
+      const next = new Date(it.medicine_next_dose_at);
+      if (Number.isNaN(next.getTime())) return false;
+      if (next.getTime() > now.getTime()) return false;
+
+      if (it.medicine_snooze_until) {
+        const snooze = new Date(it.medicine_snooze_until);
+        if (!Number.isNaN(snooze.getTime()) && snooze.getTime() > now.getTime()) return false;
+      }
+
+      return true;
+    });
+
+    if (due?.id) setDueMedicineId(due.id);
+  }, [inventory, dueMedicineId]);
+
+  const dueMedicine = dueMedicineId ? (inventory as any).find((it: any) => it.id === dueMedicineId) : null;
 
   // Combined notification count
   const notificationCount = expiringCount + expiredCount;
@@ -227,6 +307,37 @@ const Index = () => {
         userName={profile?.display_name || "User"} 
         householdName={household?.name || "Kitchen"}
         notificationCount={notificationCount}
+      />
+
+      <MedicineDoseReminder
+        isVisible={Boolean(dueMedicine)}
+        medicine={dueMedicine}
+        onTaken={async () => {
+          if (!dueMedicine) return;
+          const now = new Date();
+          const nextDoseAt = computeNextDoseAt(dueMedicine.medicine_dose_times, now);
+
+          await decrementItem(dueMedicine.id);
+          await updateItem(dueMedicine.id, {
+            medicine_last_taken_at: now.toISOString(),
+            medicine_snooze_until: null,
+            medicine_next_dose_at: nextDoseAt,
+          } as any);
+
+          setDueMedicineId(null);
+        }}
+        onNotTaken={async () => {
+          if (!dueMedicine) return;
+          const snooze = new Date();
+          snooze.setHours(snooze.getHours() + 1);
+
+          await updateItem(dueMedicine.id, {
+            medicine_snooze_until: snooze.toISOString(),
+          } as any);
+
+          setDueMedicineId(null);
+        }}
+        onDismiss={() => setDueMedicineId(null)}
       />
       
       <main className="pt-24 pb-44 px-4 max-w-4xl mx-auto">

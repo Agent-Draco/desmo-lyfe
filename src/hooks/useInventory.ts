@@ -12,6 +12,15 @@ export interface InventoryItem {
   expiry_date: string | null;
   mfg_date: string | null;
   batch: string | null;
+  item_type?: string;
+  medicine_is_dosaged?: boolean;
+  medicine_dose_amount?: number | null;
+  medicine_dose_unit?: string | null;
+  medicine_dose_times?: string[] | null;
+  medicine_timezone?: string | null;
+  medicine_next_dose_at?: string | null;
+  medicine_last_taken_at?: string | null;
+  medicine_snooze_until?: string | null;
   is_out: boolean;
   added_by: string | null;
   created_at: string;
@@ -73,14 +82,14 @@ export const useInventory = (householdId: string | null) => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      
-      // Map to include mfg_date and batch
-      const mappedItems: InventoryItem[] = (data || []).map(item => ({
+
+      // Map DB column names to UI-friendly names
+      const mappedItems: InventoryItem[] = (data || []).map((item: any) => ({
         ...item,
-        mfg_date: null,
-        batch: null,
+        mfg_date: item.manufacturing_date ?? null,
+        batch: item.batch_number ?? null,
       }));
-      
+
       setItems(mappedItems);
     } catch (error) {
       console.error("Error fetching inventory:", error);
@@ -170,6 +179,13 @@ export const useInventory = (householdId: string | null) => {
     expiry_date?: string;
     manufacturing_date?: string;
     batch_number?: string;
+    item_type?: "food" | "medicine";
+    medicine_is_dosaged?: boolean;
+    medicine_dose_amount?: number;
+    medicine_dose_unit?: string;
+    medicine_dose_times?: string[];
+    medicine_timezone?: string;
+    medicine_next_dose_at?: string;
   }) => {
     if (!householdId) return null;
 
@@ -187,6 +203,15 @@ export const useInventory = (householdId: string | null) => {
           category: item.category,
           barcode: item.barcode,
           expiry_date: item.expiry_date,
+          manufacturing_date: item.manufacturing_date,
+          batch_number: item.batch_number,
+          item_type: item.item_type || "food",
+          medicine_is_dosaged: item.medicine_is_dosaged ?? false,
+          medicine_dose_amount: item.medicine_dose_amount,
+          medicine_dose_unit: item.medicine_dose_unit,
+          medicine_dose_times: item.medicine_dose_times,
+          medicine_timezone: item.medicine_timezone,
+          medicine_next_dose_at: item.medicine_next_dose_at,
           added_by: user.id,
         })
         .select()
