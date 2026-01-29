@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ReactNode, forwardRef } from "react";
+import { LiquidGlass } from "./LiquidGlass";
 
 interface GlassCardProps {
   children: ReactNode;
@@ -8,16 +9,27 @@ interface GlassCardProps {
   isExpiring?: boolean;
   onClick?: () => void;
   delay?: number;
+  useLiquidGlass?: boolean;
+  liquidGlassProps?: {
+    surfaceType?: 'convex-circle' | 'convex-squircle' | 'concave' | 'lip';
+    bezelWidth?: number;
+    glassThickness?: number;
+    refractiveIndex?: number;
+    scale?: number;
+    specularIntensity?: number;
+  };
 }
 
-export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({ 
-  children, 
-  className, 
+export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({
+  children,
+  className,
   isExpiring = false,
   onClick,
-  delay = 0
+  delay = 0,
+  useLiquidGlass = false,
+  liquidGlassProps = {}
 }, ref) => {
-  return (
+  const cardContent = (
     <motion.div
       ref={ref}
       initial={{ opacity: 0, y: 20 }}
@@ -35,6 +47,38 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(({
       {children}
     </motion.div>
   );
+
+  if (useLiquidGlass) {
+    return (
+      <LiquidGlass
+        surfaceType={liquidGlassProps.surfaceType || 'convex-squircle'}
+        bezelWidth={liquidGlassProps.bezelWidth || 20}
+        glassThickness={liquidGlassProps.glassThickness || 8}
+        refractiveIndex={liquidGlassProps.refractiveIndex || 1.5}
+        scale={liquidGlassProps.scale || 0.6}
+        specularIntensity={liquidGlassProps.specularIntensity || 0.2}
+        className={cn(
+          "glass-card p-5 cursor-pointer transition-all duration-300",
+          isExpiring && "glow-warning border-warning/50",
+          className
+        )}
+      >
+        <motion.div
+          ref={ref}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay, ease: "easeOut" }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onClick}
+        >
+          {children}
+        </motion.div>
+      </LiquidGlass>
+    );
+  }
+
+  return cardContent;
 });
 
 GlassCard.displayName = "GlassCard";
