@@ -1,29 +1,22 @@
-# TODO: Implement All App Features
+## Comm Tab Marketplace
 
-## Steps to Complete
+- [x] **Re-add Comm Tab implementation (UI + routing)**
+- [x] **Recreate `CommView.tsx` (was deleted)**
+- [x] **Recreate marketplace schema file (optional, was deleted)**
+- [x] **Inventory -> Listing lifecycle integration**
+- [x] **Request/handshake workflow**
+- [x] **Chat negotiation system**
 
-- [x] **Manual Entry Enhancement:** Add mfg date, batch number (optional, default "-"), expiry date fields to ScanView manual mode
-- [x] **Quick Add Automation:** Update quick add to automatically calculate mfg/exp dates based on current date and market standards, set batch to "-"
-- [x] **Shopping List Feature:** Create new shopping list view, hook, and UI; integrate deletion when items added to inventory
-- [x] **Camera Permissions Fix:** Update useBarcodeScanner to properly handle permissions
-- [x] **Device Registration Display:** Show registered devices in VigilSetup page
-- [x] **Settings Buttons:** Make profile, notifications, appearance, privacy buttons functional
-- [x] **Themes System:** Implement multiple light/dark themes changeable from settings
-- [x] **Pop-up Reminders:** Add overlay notifications for expiring items with add to shopping list option
-- [x] **Expiry Disposal:** Keep expired items in inventory for 3 days then delete
+## Build Stability (Must Be Green)
 
-# New Tasks
+- [x] **Fix root TypeScript compile error causing cascade**
+- [x] **Stop mixing theme systems**
+  - [x] Use either `next-themes` everywhere OR local `ThemeContext` everywhere
+  - [x] Ensure `src/components/ui/sonner.tsx` matches chosen theme system
+- [x] **Fix TypeScript config**
+  - [x] Remove restrictive `compilerOptions.types` whitelist unless absolutely needed
+  - [x] Ensure `src/vite-env.d.ts` exists and references `vite/client`
 
-- [x] Task 1: Nudge Architect & Configuration - Build rules engine for Critical State thresholds (Food: 24h, Meds: 48h, Electronics: 168h)
-- [x] Task 2: Eat Me First Recipe Engine - Add "View Recipes" button for critical Food items, integrate Spoonacular API
-- [x] Task 3: eBay Replacement Nudge (Mockup) - Detect similar electronics and trigger eBay listing modal
-- [x] Task 4: High-Fidelity State Machine - Implement NEW/ACTIVE/CRITICAL/LISTED visual states with manual pulse button
+## Notes
 
-## Implementation Steps
-
-1. Resolve merge conflict in InventoryItem.tsx
-2. Build rulesEngine.ts with threshold logic
-3. Update GlassCard.tsx for visual states
-4. Add View Recipes button to InventoryItem.tsx
-5. Implement eBay mockup nudge logic
-6. Add Manual Pulse button to InventoryItem.tsx
+- If the first error in the Problems panel is fixed, many “cannot find module react/jsx-runtime” style errors will disappear.

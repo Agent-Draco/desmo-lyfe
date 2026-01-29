@@ -12,6 +12,7 @@ const navItems = [
   { id: "inventory", icon: Package, label: "Inventory" },
   { id: "scan", icon: Scan, label: "Scan" },
   { id: "shopping", icon: ShoppingCart, label: "Shop" },
+  { id: "comm", icon: Users, label: "Comm" },
   { id: "settings", icon: Settings, label: "Settings" },
 ];
 
