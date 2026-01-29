@@ -39,6 +39,7 @@ interface Listing {
   lister_name: string;
   item_name?: string;
   quantity?: number;
+  unit?: string | null;
   expiry_date?: string;
   created_at: string;
   updated_at: string;
@@ -109,13 +110,14 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
     void fetchMessages(selectedChat.id);
   }, [selectedChat]);
 
-  const fetchListings = async () => {
+  const fetchListings = async (modeOverride?: "s-comm" | "b-comm") => {
     setLoading(true);
     try {
+      const mode = modeOverride ?? activeMode;
       const { data, error } = await vigilSupabase
         .from("listings")
         .select("*")
-        .eq("mode", activeMode)
+        .eq("mode", mode)
         .eq("status", "active")
         .order("created_at", { ascending: false });
 
@@ -177,10 +179,12 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
 
   const createListing = async (formData: any) => {
     if (!currentUserId) return;
+    setLoading(true);
     try {
+      const chosenMode: "s-comm" | "b-comm" = (formData?.mode ?? activeMode) as any;
       const { error } = await vigilSupabase.from("listings").insert({
         ...formData,
-        mode: activeMode,
+        mode: chosenMode,
         lister_id: currentUserId,
         lister_name: household?.name || "Anonymous",
         status: "active",
@@ -190,9 +194,12 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
 
       setShowCreateForm(false);
       setSelectedInventoryItem(null);
-      await fetchListings();
+      setActiveMode(chosenMode);
+      await fetchListings(chosenMode);
     } catch (error) {
       console.error("Error creating listing:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -613,6 +620,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
                 }}
                 categories={categories.filter((c) => c !== "all")}
                 conditions={conditions}
+                initialMode={activeMode}
                 prefillData={selectedInventoryItem ? {
                   title: selectedInventoryItem.name,
                   description: `Listing ${selectedInventoryItem.name} from inventory`,
@@ -634,6 +642,7 @@ interface CreateListingFormProps {
   onCancel: () => void;
   categories: string[];
   conditions: string[];
+  initialMode: "s-comm" | "b-comm";
   prefillData?: {
     title?: string;
     description?: string;
@@ -643,16 +652,29 @@ interface CreateListingFormProps {
   };
 }
 
-const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, prefillData }: CreateListingFormProps) => {
+const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, initialMode, prefillData }: CreateListingFormProps) => {
   const [formData, setFormData] = useState({
     title: prefillData?.title || "",
     description: prefillData?.description || "",
     category: prefillData?.category || categories[0],
     condition: conditions[0],
+    mode: initialMode,
     item_name: prefillData?.item_name || "",
     quantity: 1,
+    unit: "pcs" as string,
     expiry_date: prefillData?.expiry_date || "",
   });
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      title: prefillData?.title ?? prev.title,
+      description: prefillData?.description ?? prev.description,
+      category: prefillData?.category ?? prev.category,
+      item_name: prefillData?.item_name ?? prev.item_name,
+      expiry_date: prefillData?.expiry_date ?? prev.expiry_date,
+    }));
+  }, [prefillData?.title, prefillData?.description, prefillData?.category, prefillData?.item_name, prefillData?.expiry_date]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -661,6 +683,36 @@ const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, prefill
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-2">Listing type</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setFormData({ ...formData, mode: "s-comm" })}
+            className={cn(
+              "py-2 rounded-xl font-medium transition-all",
+              formData.mode === "s-comm"
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                : "bg-background/50 text-muted-foreground hover:text-foreground border border-border/50"
+            )}
+          >
+            S-Comm
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormData({ ...formData, mode: "b-comm" })}
+            className={cn(
+              "py-2 rounded-xl font-medium transition-all",
+              formData.mode === "b-comm"
+                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                : "bg-background/50 text-muted-foreground hover:text-foreground border border-border/50"
+            )}
+          >
+            B-Comm
+          </button>
+        </div>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">Title</label>
         <input
@@ -728,13 +780,28 @@ const CreateListingForm = ({ onSubmit, onCancel, categories, conditions, prefill
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">Quantity</label>
-          <input
-            type="number"
-            min={1}
-            value={formData.quantity}
-            onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) })}
-            className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={1}
+              value={formData.quantity}
+              onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) })}
+              className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <select
+              value={formData.unit}
+              onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+              className="w-28 px-3 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="pcs">pcs</option>
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+              <option value="l">l</option>
+              <option value="ml">ml</option>
+              <option value="pack">pack</option>
+              <option value="box">box</option>
+            </select>
+          </div>
         </div>
       </div>
 

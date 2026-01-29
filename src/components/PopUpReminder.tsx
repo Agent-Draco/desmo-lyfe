@@ -33,6 +33,15 @@ interface PopUpReminderProps {
   expiringItems: ExpiringItem[];
   onDismiss: () => void;
   onAddToShoppingList: (itemName: string) => void;
+  onSeeRecipes?: (ingredient: string) => void;
+  commListings?: Array<{
+    id: string;
+    title: string;
+    mode: "s-comm" | "b-comm";
+    lister_name?: string;
+    quantity?: number;
+    unit?: string | null;
+  }>;
 }
 
 export const PopUpReminder = ({
@@ -40,6 +49,8 @@ export const PopUpReminder = ({
   expiringItems,
   onDismiss,
   onAddToShoppingList,
+  onSeeRecipes,
+  commListings = [],
 }: PopUpReminderProps) => {
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
@@ -71,6 +82,10 @@ export const PopUpReminder = ({
     persistHandled(currentItem.id);
     setAddedItems(prev => new Set(prev).add(currentItem.id));
     handleNext();
+  };
+
+  const handleSeeRecipes = () => {
+    onSeeRecipes?.(currentItem.name);
   };
 
   const handleSkip = () => {
@@ -167,6 +182,16 @@ export const PopUpReminder = ({
 
           {/* Actions */}
           <div className="px-6 pb-6 space-y-3">
+            {onSeeRecipes && (
+              <Button
+                variant="outline"
+                onClick={handleSeeRecipes}
+                className="w-full h-11"
+              >
+                See some yummy recipes
+              </Button>
+            )}
+
             <Button
               onClick={handleAddToList}
               className="w-full h-12 text-base font-semibold"
@@ -175,6 +200,32 @@ export const PopUpReminder = ({
               <ShoppingCart className="w-5 h-5 mr-2" />
               Add to Shopping List
             </Button>
+
+            {commListings.length > 0 && (
+              <div className="pt-2">
+                <div className="text-xs font-semibold text-muted-foreground mb-2">
+                  Community listings
+                </div>
+                <div className="space-y-2 max-h-28 overflow-y-auto">
+                  {commListings.slice(0, 6).map((l) => (
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground truncate">{l.title}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {(l.mode === "s-comm" ? "S-Comm" : "B-Comm")}{l.lister_name ? ` • ${l.lister_name}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground flex-shrink-0">
+                        {typeof l.quantity === "number" ? `${l.quantity}${l.unit ? ` ${l.unit}` : ""}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button

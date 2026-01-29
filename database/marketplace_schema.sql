@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS listings (
     lister_name TEXT NOT NULL,
     item_name TEXT,
     quantity INTEGER DEFAULT 1,
+    unit TEXT DEFAULT 'pcs',
     expiry_date DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

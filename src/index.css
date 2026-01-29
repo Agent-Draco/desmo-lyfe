@@ -326,6 +326,39 @@
     border-color: hsla(45, 100%, 50%, 0.5);
   }
 
+  /* Lifetime progression glows */
+  .glow-green {
+    box-shadow:
+      0 0 18px hsla(145, 65%, 42%, 0.35),
+      0 0 36px hsla(145, 65%, 42%, 0.18),
+      inset 0 1px 1px hsla(0, 0%, 100%, 0.6);
+    border-color: hsla(145, 65%, 42%, 0.45);
+  }
+
+  .glow-yellow {
+    box-shadow:
+      0 0 18px hsla(45, 100%, 50%, 0.38),
+      0 0 36px hsla(45, 100%, 50%, 0.18),
+      inset 0 1px 1px hsla(0, 0%, 100%, 0.6);
+    border-color: hsla(45, 100%, 50%, 0.5);
+  }
+
+  .glow-orange {
+    box-shadow:
+      0 0 18px hsla(30, 100%, 50%, 0.38),
+      0 0 36px hsla(30, 100%, 50%, 0.18),
+      inset 0 1px 1px hsla(0, 0%, 100%, 0.6);
+    border-color: hsla(30, 100%, 50%, 0.5);
+  }
+
+  .glow-red {
+    box-shadow:
+      0 0 18px hsla(0, 72%, 51%, 0.38),
+      0 0 36px hsla(0, 72%, 51%, 0.18),
+      inset 0 1px 1px hsla(0, 0%, 100%, 0.6);
+    border-color: hsla(0, 72%, 51%, 0.5);
+  }
+
   .glow-success {
     box-shadow: 
       0 0 20px hsla(145, 65%, 42%, 0.4),

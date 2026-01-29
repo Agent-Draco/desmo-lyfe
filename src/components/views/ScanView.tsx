@@ -10,6 +10,9 @@ import jsQR from "jsqr";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+const GOOGLE_VISION_API_KEY = import.meta.env.VITE_GOOGLE_VISION_API_KEY as string | undefined;
+
 const PHOTO_SCAN_BETA = import.meta.env.VITE_PHOTO_SCAN_BETA === "true";
 
 interface ScanViewProps {
@@ -268,6 +271,105 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return { exp, mfg, batch };
   };
 
+  const canvasToBase64 = (canvas: HTMLCanvasElement) => {
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    return dataUrl.split(",")[1] || "";
+  };
+
+  const safeIsoDate = (raw: any) => {
+    if (!raw || typeof raw !== "string") return undefined;
+    const s = raw.trim();
+    if (!s) return undefined;
+    // Basic YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // Attempt to normalize YYYY/M/D or YYYY.M.D
+    const m = s.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+    if (m) {
+      const yyyy = m[1];
+      const mm = String(m[2]).padStart(2, "0");
+      const dd = String(m[3]).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    return undefined;
+  };
+
+  const runGoogleVision = async (base64Jpeg: string) => {
+    if (!GOOGLE_VISION_API_KEY) return { name: undefined as string | undefined };
+
+    const body = {
+      requests: [
+        {
+          image: { content: base64Jpeg },
+          features: [
+            { type: "LABEL_DETECTION", maxResults: 5 },
+            { type: "WEB_DETECTION", maxResults: 5 },
+            { type: "LOGO_DETECTION", maxResults: 3 },
+          ],
+        },
+      ],
+    };
+
+    const res = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(GOOGLE_VISION_API_KEY)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!res.ok) throw new Error(`Google Vision error: ${res.status}`);
+    const json: any = await res.json();
+    const first = json?.responses?.[0];
+
+    const webBest = first?.webDetection?.bestGuessLabels?.[0]?.label as string | undefined;
+    const logo = first?.logoAnnotations?.[0]?.description as string | undefined;
+    const label = first?.labelAnnotations?.[0]?.description as string | undefined;
+
+    const name = webBest || logo || label;
+    return { name };
+  };
+
+  const runGeminiParse = async (ocrTextInput: string, visionHint?: string) => {
+    if (!GEMINI_API_KEY) return { name: undefined as string | undefined, mfg: undefined as string | undefined, exp: undefined as string | undefined, batch: undefined as string | undefined };
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `Extract product info from OCR text. Return ONLY strict JSON with keys: name, mfg, exp, batch.
+
+Rules:
+- mfg and exp must be YYYY-MM-DD if possible.
+- batch should be alphanumeric (may include -).
+- If unknown, use null.
+
+Vision hint (may be null): ${visionHint ?? "null"}
+
+OCR text:\n${ocrTextInput}`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    // Try to parse JSON from model output (strip code fences if present)
+    const cleaned = text
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .trim();
+
+    try {
+      const parsed = JSON.parse(cleaned);
+      return {
+        name: typeof parsed?.name === "string" ? parsed.name : undefined,
+        mfg: safeIsoDate(parsed?.mfg),
+        exp: safeIsoDate(parsed?.exp),
+        batch: typeof parsed?.batch === "string" ? parsed.batch : undefined,
+      };
+    } catch {
+      return { name: undefined, mfg: undefined, exp: undefined, batch: undefined };
+    }
+  };
+
   const runPhotoOcrOnce = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
@@ -293,11 +395,38 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
       setOcrText(text);
 
       const extracted = extractDatesAndBatch(text);
+
+      const base64 = canvasToBase64(canvas);
+      let visionName: string | undefined;
+      try {
+        const vision = await runGoogleVision(base64);
+        visionName = vision.name;
+      } catch (e) {
+        // ignore vision errors
+      }
+
+      let geminiParsed: { name?: string; mfg?: string; exp?: string; batch?: string } = {};
+      try {
+        geminiParsed = await runGeminiParse(text, visionName);
+      } catch (e) {
+        // ignore gemini errors
+      }
+
+      const finalName =
+        manualName.trim() ||
+        geminiParsed.name?.trim() ||
+        visionName?.trim() ||
+        "Scanned Item";
+
+      if (!manualName.trim() && finalName && finalName !== "Scanned Item") {
+        setManualName(finalName);
+      }
+
       setPhotoResult({
-        name: manualName.trim() || "Scanned Item",
-        mfg: extracted.mfg,
-        exp: extracted.exp,
-        batch: extracted.batch,
+        name: finalName,
+        mfg: geminiParsed.mfg ?? extracted.mfg,
+        exp: geminiParsed.exp ?? extracted.exp,
+        batch: geminiParsed.batch ?? extracted.batch,
       });
     } catch (err) {
       console.error("Photo OCR failed:", err);

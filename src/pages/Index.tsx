@@ -7,6 +7,7 @@ import { RemovalModeToggle } from "@/components/RemovalModeToggle";
 import { SuccessFlash } from "@/components/SuccessFlash";
 import { PopUpReminder } from "@/components/PopUpReminder";
 import { MedicineDoseReminder } from "@/components/MedicineDoseReminder";
+import { RecipeDrawer } from "@/components/RecipeDrawer";
 import { HomeView } from "@/components/views/HomeView";
 import { InventoryView } from "@/components/views/InventoryView";
 import { ShoppingListView } from "@/components/views/ShoppingListView";
@@ -22,6 +23,7 @@ import { useShoppingList } from "@/hooks/useShoppingList";
 import { useExpiryNotifications } from "@/hooks/useExpiryNotifications";
 import { quickAddPresets } from "@/components/QuickAddPreset";
 import { Loader2 } from "lucide-react";
+import { vigilSupabase } from "@/integrations/vigil/client";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("home");
@@ -30,6 +32,10 @@ const Index = () => {
   const [showReminder, setShowReminder] = useState(false);
   const [expiringItems, setExpiringItems] = useState([]);
   const [dueMedicineId, setDueMedicineId] = useState<string | null>(null);
+  const [recipeIngredient, setRecipeIngredient] = useState<string | null>(null);
+  const [commListings, setCommListings] = useState<
+    Array<{ id: string; title: string; mode: "s-comm" | "b-comm"; lister_name?: string; quantity?: number; unit?: string | null }>
+  >([]);
   const navigate = useNavigate();
 
   const { user, profile, household, loading: authLoading, signOut, hasHousehold } = useAuth();
@@ -77,6 +83,33 @@ const Index = () => {
       }
     }
   }, [inventory]);
+
+  useEffect(() => {
+    if (!showReminder) return;
+    let cancelled = false;
+
+    const fetchCommListings = async () => {
+      try {
+        const { data, error } = await vigilSupabase
+          .from("listings")
+          .select("id,title,mode,lister_name,quantity,unit")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(12);
+
+        if (error) throw error;
+        if (!cancelled) setCommListings(((data as any[]) || []) as any);
+      } catch (e) {
+        // If the Vigil schema doesn't include unit or listings isn't available, keep empty.
+        if (!cancelled) setCommListings([]);
+      }
+    };
+
+    void fetchCommListings();
+    return () => {
+      cancelled = true;
+    };
+  }, [showReminder]);
 
   const handleItemClick = async (id: string) => {
     if (removalMode) {
@@ -372,6 +405,14 @@ const Index = () => {
           await addShoppingItem({ item_name: itemName, quantity: 1 });
           setShowReminder(false);
         }}
+        onSeeRecipes={(ingredient) => setRecipeIngredient(ingredient)}
+        commListings={commListings}
+      />
+
+      <RecipeDrawer
+        isOpen={Boolean(recipeIngredient)}
+        ingredient={recipeIngredient ?? ""}
+        onClose={() => setRecipeIngredient(null)}
       />
     </div>
   );

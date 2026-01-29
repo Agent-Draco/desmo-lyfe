@@ -91,6 +91,30 @@ export const InventoryItem = ({
 
   const daysUntilExpiry = getDaysUntilExpiry(expiryDate);
 
+  const getLifetimeGlowClass = (mfg?: Date, exp?: Date) => {
+    if (!mfg || !exp) return undefined;
+    const start = mfg.getTime();
+    const end = exp.getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return undefined;
+
+    const now = Date.now();
+    const progress = (now - start) / (end - start);
+    if (!Number.isFinite(progress)) return undefined;
+
+    // Thresholds:
+    // - 50%: green
+    // - 75%: yellow
+    // - 90%: orange
+    // - 95%: red
+    if (progress >= 0.95) return "glow-red";
+    if (progress >= 0.9) return "glow-orange";
+    if (progress >= 0.75) return "glow-yellow";
+    if (progress >= 0.5) return "glow-green";
+    return undefined;
+  };
+
+  const lifetimeGlow = getLifetimeGlowClass(mfgDate, expiryDate);
+
   return (
     <GlassCard
       isExpiring={isExpiring}
@@ -98,6 +122,7 @@ export const InventoryItem = ({
       delay={delay}
       className={cn(
         "relative overflow-hidden",
+        lifetimeGlow,
         !isInStock && "opacity-60"
       )}
     >
