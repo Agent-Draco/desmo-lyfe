@@ -10,6 +10,7 @@ interface GlassNavProps {
 const navItems = [
   { id: "home", icon: Home, label: "Home" },
   { id: "inventory", icon: Package, label: "Inventory" },
+  { id: "nudges", icon: Bell, label: "Nudges" },
   { id: "scan", icon: Scan, label: "Scan" },
   { id: "shopping", icon: ShoppingCart, label: "Shop" },
   { id: "settings", icon: Settings, label: "Settings" },

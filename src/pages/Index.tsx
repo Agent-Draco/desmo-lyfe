@@ -202,6 +202,8 @@ const Index = () => {
         );
       case "scan":
         return <ScanView onAddItem={handleAddItem} />;
+      case "nudges":
+        return <NudgesView />;
       case "family":
         return <FamilyView household={household} currentUserId={user?.id || null} />;
       case "settings":
