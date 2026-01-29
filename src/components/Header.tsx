@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Bell, Plus } from "lucide-react";
-import desmoLogo from "@/assets/asterisk.png";
+import asteriskLogo from "@/assets/asterisk.png";
 
 interface HeaderProps {
   userName?: string;
@@ -28,7 +28,7 @@ export const Header = ({
             transition={{ delay: 0.2, type: "spring", bounce: 0.4 }}
             className="w-10 h-10 rounded-lg overflow-hidden bg-background/50 flex items-center justify-center p-1"
           >
-            <img src={desmoLogo} alt="Desmo" className="w-full h-full object-contain" />
+            <img src={asteriskLogo} alt="asterisk" className="w-full h-full object-contain" />
           </motion.div>
           <div>
             <motion.p

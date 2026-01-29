@@ -36,7 +36,7 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
 
   // Load theme from localStorage on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('desmo-theme') as Theme;
+    const savedTheme = localStorage.getItem('asterisk-theme') as Theme;
     if (savedTheme && themes.some(t => t.id === savedTheme)) {
       setThemeState(savedTheme);
     }
@@ -53,7 +53,7 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     root.classList.add(theme);
 
     // Save to localStorage
-    localStorage.setItem('desmo-theme', theme);
+    localStorage.setItem('asterisk-theme', theme);
   }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
