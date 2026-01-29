@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
 import { z } from "zod";
-import asterisk from "@/assets/asterisk.png";
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 const Auth = () => {
@@ -172,8 +171,9 @@ const Auth = () => {
           type: "spring",
           duration: 0.6
         }} className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center">
-            <img src={asterisk} alt="Asterisk" className="w-full h-full object-contain" />
+            <span className="text-4xl">🥗</span>
           </motion.div>
+          <h1 className="text-3xl font-bold text-foreground">AsteRISK</h1>
           <p className="text-muted-foreground mt-2">Family Kitchen Inventory</p>
         </div>
 
