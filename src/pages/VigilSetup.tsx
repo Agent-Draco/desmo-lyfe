@@ -8,7 +8,7 @@ import { useVigilSettings } from "@/hooks/useVigilSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { vigilSupabase } from "@/integrations/vigil/client";
 import { ArrowLeft, Loader2, Wifi, Check, AlertCircle, Monitor } from "lucide-react";
-import desmoLogo from "@/assets/Asterisk.png";
+import desmoLogo from "@/assets/asterisk.png";
 
 interface RegisteredDevice {
   device_serial: string;
