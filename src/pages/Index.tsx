@@ -178,6 +178,7 @@ const Index = () => {
     exp?: string;
     mfg?: string;
     item_type?: "food" | "medicine";
+    category?: string;
     medicine_is_dosaged?: boolean;
     medicine_dose_amount?: number;
     medicine_dose_unit?: string;
@@ -191,6 +192,7 @@ const Index = () => {
       expiry_date: item.exp,
       manufacturing_date: item.mfg,
       item_type: item.item_type,
+      category: item.category,
       medicine_is_dosaged: item.medicine_is_dosaged,
       medicine_dose_amount: item.medicine_dose_amount,
       medicine_dose_unit: item.medicine_dose_unit,

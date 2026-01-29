@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { vigilSupabase } from "@/integrations/vigil/client";
 import { useToast } from "@/hooks/use-toast";
 
 export interface InventoryItem {
@@ -37,7 +38,7 @@ export const useInventory = (householdId: string | null) => {
 
   const deleteItem = useCallback(async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await vigilSupabase
         .from("inventory_items")
         .delete()
         .eq("id", id);
@@ -71,12 +72,9 @@ export const useInventory = (householdId: string | null) => {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await vigilSupabase
         .from("inventory_items")
-        .select(`
-          *,
-          profile:profiles!inventory_items_added_by_fkey(display_name)
-        `)
+        .select("*")
         .eq("household_id", householdId)
         .order("created_at", { ascending: false });
 
@@ -133,7 +131,7 @@ export const useInventory = (householdId: string | null) => {
   useEffect(() => {
     if (!householdId) return;
 
-    const channel = supabase
+    const channel = vigilSupabase
       .channel("inventory-changes")
       .on(
         "postgres_changes",
@@ -145,7 +143,7 @@ export const useInventory = (householdId: string | null) => {
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            fetchItems(); // Refetch to get profile info
+            fetchItems();
           } else if (payload.eventType === "UPDATE") {
             setItems((prev) =>
               prev.map((item) =>
@@ -164,7 +162,7 @@ export const useInventory = (householdId: string | null) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      vigilSupabase.removeChannel(channel);
     };
   }, [householdId, fetchItems]);
 
@@ -190,7 +188,7 @@ export const useInventory = (householdId: string | null) => {
     if (!user) return null;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await vigilSupabase
         .from("inventory_items")
         .insert({
           household_id: householdId,
@@ -238,7 +236,7 @@ export const useInventory = (householdId: string | null) => {
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
     try {
-      const { error } = await supabase
+      const { error } = await vigilSupabase
         .from("inventory_items")
         .update(updates)
         .eq("id", id);

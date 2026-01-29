@@ -3,8 +3,7 @@ const HARDCODED_SPOONACULAR_API_KEY = "c215a07fd1a942f39c156779f2f59894";
 const SPOONACULAR_API_KEY =
   (import.meta.env.VITE_SPOONACULAR_API_KEY as string | undefined) ||
   (HARDCODED_SPOONACULAR_API_KEY || undefined);
-const SPOONACULAR_RANDOM_ENDPOINT_RAW = "https://api.spoonacular.com/recipies/random";
-const SPOONACULAR_RANDOM_ENDPOINT = SPOONACULAR_RANDOM_ENDPOINT_RAW.replace("/recipies/", "/recipes/");
+const SPOONACULAR_COMPLEX_SEARCH_ENDPOINT = "https://api.spoonacular.com/recipes/complexSearch";
 
 export interface Recipe {
   id: number;
@@ -49,28 +48,30 @@ export async function findRecipesByIngredients(
   preferences?: SpoonacularPreferences,
 ): Promise<Recipe[]> {
   try {
-    const url = new URL(SPOONACULAR_RANDOM_ENDPOINT);
     if (!SPOONACULAR_API_KEY) {
       console.error("Missing Spoonacular API key");
       return [];
     }
+
+    const url = new URL(SPOONACULAR_COMPLEX_SEARCH_ENDPOINT);
     url.searchParams.set("apiKey", SPOONACULAR_API_KEY);
     url.searchParams.set("number", "5");
+    url.searchParams.set("addRecipeInformation", "true");
+    url.searchParams.set("fillIngredients", "true");
+    url.searchParams.set("instructionsRequired", "true");
 
-    const tags: string[] = [];
-    const ingredientTag = ingredients
+    const includeIngredients = ingredients
       .map((i) => i.trim())
       .filter(Boolean)
-      .slice(0, 2)
+      .slice(0, 5)
       .join(",");
-    if (ingredientTag) tags.push(ingredientTag);
+    if (includeIngredients) url.searchParams.set("includeIngredients", includeIngredients);
 
     const diet = preferences?.diet?.trim();
-    if (diet && diet !== "none") tags.push(diet);
+    if (diet && diet !== "none") url.searchParams.set("diet", diet);
 
-    // Spoonacular random endpoint doesn't fully support strict ingredient filtering.
-    // Tags are a best-effort way to bias results toward the ingredient.
-    if (tags.length) url.searchParams.set("tags", tags.join(","));
+    const intolerances = (preferences?.intolerances ?? []).map((s) => s.trim()).filter(Boolean);
+    if (intolerances.length) url.searchParams.set("intolerances", intolerances.slice(0, 10).join(","));
 
     const response = await fetch(url.toString());
     if (!response.ok) {
@@ -78,8 +79,8 @@ export async function findRecipesByIngredients(
     }
 
     const payload = (await response.json()) as any;
-    const recipesRaw: any[] = Array.isArray(payload?.recipes) ? payload.recipes : [];
-    const mapped: Recipe[] = recipesRaw
+    const results: any[] = Array.isArray(payload?.results) ? payload.results : [];
+    const mapped: Recipe[] = results
       .map((r) => {
         const image: string = typeof r?.image === "string" ? r.image : "";
         const imageType = typeof r?.imageType === "string" ? r.imageType : (image.split(".").pop() || "jpg");
@@ -95,11 +96,6 @@ export async function findRecipesByIngredients(
         } as Recipe;
       })
       .filter((r) => Number.isFinite(r.id));
-
-    // Light preference filter (best-effort): if user provided a diet string, keep all.
-    // Avoid dropping everything due to random endpoint limitations.
-    void ingredients;
-    void preferences;
 
     return mapped;
   } catch (error) {

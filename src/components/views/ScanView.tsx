@@ -1,19 +1,35 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Keyboard, Barcode, X, Loader2, Check } from "lucide-react";
+import { Camera, Keyboard, X, Loader2, Check } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
-import jsQR from "jsqr";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 const GOOGLE_VISION_API_KEY = import.meta.env.VITE_GOOGLE_VISION_API_KEY as string | undefined;
 
-const PHOTO_SCAN_BETA = import.meta.env.VITE_PHOTO_SCAN_BETA === "true";
+const CATEGORY_OPTIONS = [
+  "Dairy",
+  "Eggs",
+  "Gluten",
+  "Wheat",
+  "Peanuts",
+  "Tree Nuts",
+  "Soy",
+  "Fish",
+  "Shellfish",
+  "Sesame",
+  "Vegan",
+  "Vegetarian",
+  "Halal",
+  "Kosher",
+  "Keto",
+  "Low Carb",
+  "Low Sugar",
+  "Low Sodium",
+  "Low FODMAP",
+];
 
 interface ScanViewProps {
   onAddItem: (item: {
@@ -24,6 +40,7 @@ interface ScanViewProps {
     exp?: string;
     mfg?: string;
     item_type?: "food" | "medicine";
+    category?: string;
     medicine_is_dosaged?: boolean;
     medicine_dose_amount?: number;
     medicine_dose_unit?: string;
@@ -34,13 +51,15 @@ interface ScanViewProps {
 }
 
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
-  const [mode, setMode] = useState<"choice" | "scan" | "manual" | "photo">("choice");
+  const [mode, setMode] = useState<"choice" | "manual" | "photo">("choice");
+
   const [manualName, setManualName] = useState("");
   const [manualQuantity, setManualQuantity] = useState("1");
   const [manualUnit, setManualUnit] = useState("pcs");
   const [manualMfgDate, setManualMfgDate] = useState("");
   const [manualExpiryDate, setManualExpiryDate] = useState("");
   const [manualItemType, setManualItemType] = useState<"food" | "medicine">("food");
+  const [manualCategory, setManualCategory] = useState<string>("");
   const [manualMedicineIsDosaged, setManualMedicineIsDosaged] = useState(false);
   const [manualDoseAmount, setManualDoseAmount] = useState("");
   const [manualDoseUnit, setManualDoseUnit] = useState("tablet");
@@ -48,10 +67,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [loading, setLoading] = useState(false);
   const [ocrText, setOcrText] = useState<string>("");
   const [photoResult, setPhotoResult] = useState<{ name: string; mfg?: string; exp?: string } | null>(null);
-  const [scannedProduct, setScannedProduct] = useState<{
-    name: string;
-    barcode: string;
-  } | null>(null);
 
   const parseDoseTimes = (raw: string) => {
     const parts = raw
@@ -102,151 +117,10 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return "food";
   };
 
-  const { videoRef, lookupBarcode, startScanning, stopScanning } = useBarcodeScanner();
+  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scanIntervalRef = useRef<number | null>(null);
   const photoIntervalRef = useRef<number | null>(null);
-  const lastScannedRef = useRef<string | null>(null);
-  const scanCountRef = useRef<Map<string, number>>(new Map());
-
-  const barcodeDetectorRef = useRef<any | null>(null);
-  const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-  const isDecodingRef = useRef(false);
-
-  const handleBarcodeDetected = useCallback(
-    async (barcode: string) => {
-      // Prevent duplicate scans
-      if (lastScannedRef.current === barcode) return;
-
-      // Require multiple consistent reads for accuracy
-      const count = (scanCountRef.current.get(barcode) || 0) + 1;
-      scanCountRef.current.set(barcode, count);
-
-      // Only accept after 3 consistent reads
-      if (count < 3) return;
-
-      lastScannedRef.current = barcode;
-      setLoading(true);
-      stopScanning();
-
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-        scanIntervalRef.current = null;
-      }
-
-      const product = await lookupBarcode(barcode);
-
-      if (product) {
-        const guessed = guessItemType(product.name);
-        setManualItemType(guessed);
-        setManualMedicineIsDosaged(false);
-        setScannedProduct({
-          name: product.name,
-          barcode,
-        });
-      } else {
-        setManualItemType("food");
-        setManualMedicineIsDosaged(false);
-        setScannedProduct({
-          name: `Product ${barcode}`,
-          barcode,
-        });
-      }
-      setLoading(false);
-    },
-    [lookupBarcode, stopScanning]
-  );
-
-  const scanFrame = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    if (isDecodingRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx || video.readyState !== video.HAVE_ENOUGH_DATA) return;
-
-    isDecodingRef.current = true;
-
-    try {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // 1) Native BarcodeDetector (best when available)
-      const BarcodeDetectorCtor = (window as any).BarcodeDetector;
-      if (BarcodeDetectorCtor) {
-        if (!barcodeDetectorRef.current) {
-          barcodeDetectorRef.current = new BarcodeDetectorCtor({
-            formats: [
-              "qr_code",
-              "ean_13",
-              "ean_8",
-              "upc_a",
-              "upc_e",
-              "code_128",
-              "code_39",
-              "code_93",
-              "itf",
-              "data_matrix",
-              "pdf417",
-              "aztec",
-            ],
-          });
-        }
-
-        const detections = await barcodeDetectorRef.current.detect(canvas);
-        const raw = detections?.[0]?.rawValue;
-        if (raw) {
-          await handleBarcodeDetected(String(raw));
-          return;
-        }
-      }
-
-      // 2) ZXing fallback (supports 1D + 2D)
-      if (!zxingReaderRef.current) {
-        const hints = new Map();
-        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-          BarcodeFormat.EAN_13,
-          BarcodeFormat.EAN_8,
-          BarcodeFormat.UPC_A,
-          BarcodeFormat.UPC_E,
-          BarcodeFormat.CODE_128,
-          BarcodeFormat.CODE_39,
-          BarcodeFormat.CODE_93,
-          BarcodeFormat.ITF,
-          BarcodeFormat.QR_CODE,
-          BarcodeFormat.DATA_MATRIX,
-          BarcodeFormat.PDF_417,
-          BarcodeFormat.AZTEC,
-        ]);
-        zxingReaderRef.current = new BrowserMultiFormatReader(hints);
-      }
-
-      try {
-        const result = await zxingReaderRef.current.decodeFromCanvas(canvas);
-        const text = result?.getText?.();
-        if (text) {
-          await handleBarcodeDetected(text);
-          return;
-        }
-      } catch {
-        // ignore not-found frames
-      }
-
-      // 3) jsQR fallback (QR-only, but very reliable for QR)
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const qr = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert",
-      });
-      if (qr?.data) {
-        await handleBarcodeDetected(qr.data);
-      }
-    } finally {
-      isDecodingRef.current = false;
-    }
-  }, [videoRef, handleBarcodeDetected]);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const extractDates = (text: string) => {
     const normalized = text.replace(/\s+/g, " ").trim();
@@ -266,18 +140,11 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return { exp, mfg };
   };
 
-  const canvasToBase64 = (canvas: HTMLCanvasElement) => {
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    return dataUrl.split(",")[1] || "";
-  };
-
   const safeIsoDate = (raw: any) => {
     if (!raw || typeof raw !== "string") return undefined;
     const s = raw.trim();
     if (!s) return undefined;
-    // Basic YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // Attempt to normalize YYYY/M/D or YYYY.M.D
     const m = s.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
     if (m) {
       const yyyy = m[1];
@@ -325,17 +192,37 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return { name };
   };
 
-  const runGeminiParse = async (ocrTextInput: string, visionHint?: string) => {
-    if (!GEMINI_API_KEY) return { name: undefined as string | undefined, mfg: undefined as string | undefined, exp: undefined as string | undefined };
+  const runGeminiParse = async (
+    ocrTextInput: string,
+    visionHint?: string
+  ): Promise<{
+    name?: string;
+    mfg?: string;
+    exp?: string;
+    item_type?: "food" | "medicine";
+    category?: string;
+  }> => {
+    if (!GEMINI_API_KEY) {
+      return {
+        name: undefined as string | undefined,
+        mfg: undefined as string | undefined,
+        exp: undefined as string | undefined,
+        item_type: undefined as "food" | "medicine" | undefined,
+        category: undefined as string | undefined,
+      };
+    }
+
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `Extract product info from OCR text. Return ONLY strict JSON with keys: name, mfg, exp.
+    const prompt = `Extract product info from OCR text. Return ONLY strict JSON with keys: name, mfg, exp, item_type, category.
 
 Rules:
 - mfg and exp must be YYYY-MM-DD if possible.
 - If unknown, use null.
+- item_type must be either "food" or "medicine".
+- category should be one of: ${CATEGORY_OPTIONS.join(", ")}. If unsure, use null.
 
 Vision hint (may be null): ${visionHint ?? "null"}
 
@@ -357,9 +244,11 @@ OCR text:\n${ocrTextInput}`;
         name: typeof parsed?.name === "string" ? parsed.name : undefined,
         mfg: safeIsoDate(parsed?.mfg),
         exp: safeIsoDate(parsed?.exp),
+        item_type: parsed?.item_type === "medicine" ? "medicine" : (parsed?.item_type === "food" ? "food" : undefined),
+        category: typeof parsed?.category === "string" ? parsed.category : undefined,
       };
     } catch {
-      return { name: undefined, mfg: undefined, exp: undefined };
+      return { name: undefined, mfg: undefined, exp: undefined, item_type: undefined, category: undefined };
     }
   };
 
@@ -381,6 +270,7 @@ OCR text:\n${ocrTextInput}`;
     try {
       const { createWorker } = await import("tesseract.js");
       const worker = await createWorker("eng");
+
       const { data } = await worker.recognize(canvas);
       await worker.terminate();
 
@@ -389,7 +279,7 @@ OCR text:\n${ocrTextInput}`;
 
       const extracted = extractDates(text);
 
-      const base64 = canvasToBase64(canvas);
+      const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
       let visionName: string | undefined;
       try {
         const vision = await runGoogleVision(base64);
@@ -398,7 +288,7 @@ OCR text:\n${ocrTextInput}`;
         // ignore vision errors
       }
 
-      let geminiParsed: { name?: string; mfg?: string; exp?: string } = {};
+      let geminiParsed: { name?: string; mfg?: string; exp?: string; item_type?: "food" | "medicine"; category?: string } = {};
       try {
         geminiParsed = await runGeminiParse(text, visionName);
       } catch (e) {
@@ -415,6 +305,15 @@ OCR text:\n${ocrTextInput}`;
         setManualName(finalName);
       }
 
+      if (geminiParsed?.item_type && geminiParsed.item_type !== manualItemType) {
+        setManualItemType(geminiParsed.item_type);
+        if (geminiParsed.item_type === "food") setManualMedicineIsDosaged(false);
+      }
+
+      if (typeof geminiParsed?.category === "string" && geminiParsed.category.trim()) {
+        setManualCategory(geminiParsed.category.trim());
+      }
+
       setPhotoResult({
         name: finalName,
         mfg: geminiParsed.mfg ?? extracted.mfg,
@@ -425,32 +324,35 @@ OCR text:\n${ocrTextInput}`;
     } finally {
       setLoading(false);
     }
-  }, [manualName, videoRef]);
+  }, [manualName, manualItemType]);
 
-  const startJsQRScanner = useCallback(async () => {
-    try {
-      await startScanning();
-
-      // Reset scan tracking
-      lastScannedRef.current = null;
-      scanCountRef.current.clear();
-
-      // Start scanning loop
-      scanIntervalRef.current = window.setInterval(() => {
-        void scanFrame();
-      }, 200);
-    } catch (error) {
-      console.error("Scanner error:", error);
+  const stopCamera = useCallback(() => {
+    const s = mediaStreamRef.current;
+    if (s) {
+      for (const t of s.getTracks()) t.stop();
     }
-  }, [startScanning, scanFrame]);
+    mediaStreamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    if (mediaStreamRef.current) return;
+    if (!videoRef.current) return;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false,
+    });
+    mediaStreamRef.current = stream;
+    videoRef.current.srcObject = stream;
+    await videoRef.current.play();
+  }, []);
 
   useEffect(() => {
-    if (mode === "scan" && !scannedProduct) {
-      startJsQRScanner();
-    }
-
     if (mode === "photo") {
-      void startScanning();
+      void startCamera();
       setOcrText("");
       setPhotoResult(null);
 
@@ -460,44 +362,13 @@ OCR text:\n${ocrTextInput}`;
     }
 
     return () => {
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-        scanIntervalRef.current = null;
-      }
-
       if (photoIntervalRef.current) {
         clearInterval(photoIntervalRef.current);
         photoIntervalRef.current = null;
       }
-      stopScanning();
+      stopCamera();
     };
-  }, [mode, scannedProduct, startJsQRScanner, stopScanning, startScanning, runPhotoOcrOnce]);
-
-  const handleAddScannedProduct = async () => {
-    if (!scannedProduct) return;
-
-    setLoading(true);
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const doseTimes = manualItemType === "medicine" && manualMedicineIsDosaged ? parseDoseTimes(manualDoseTimesRaw) : [];
-    const nextDoseAt = manualItemType === "medicine" && manualMedicineIsDosaged ? computeNextDoseAt(doseTimes) : undefined;
-
-    await onAddItem({
-      name: scannedProduct.name,
-      barcode: scannedProduct.barcode,
-      item_type: manualItemType,
-      medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
-      medicine_dose_amount: manualItemType === "medicine" && manualMedicineIsDosaged ? Number(manualDoseAmount) || 1 : undefined,
-      medicine_dose_unit: manualItemType === "medicine" && manualMedicineIsDosaged ? manualDoseUnit : undefined,
-      medicine_dose_times: manualItemType === "medicine" && manualMedicineIsDosaged ? doseTimes : undefined,
-      medicine_timezone: manualItemType === "medicine" && manualMedicineIsDosaged ? tz : undefined,
-      medicine_next_dose_at: manualItemType === "medicine" && manualMedicineIsDosaged ? nextDoseAt : undefined,
-    });
-    setScannedProduct(null);
-    setMode("choice");
-    lastScannedRef.current = null;
-    scanCountRef.current.clear();
-    setLoading(false);
-  };
+  }, [mode, runPhotoOcrOnce, startCamera, stopCamera]);
 
   const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -516,6 +387,7 @@ OCR text:\n${ocrTextInput}`;
       mfg: manualMfgDate.trim(),
       exp: manualExpiryDate.trim(),
       item_type: manualItemType,
+      category: manualCategory.trim() || undefined,
       medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
       medicine_dose_amount: manualItemType === "medicine" && manualMedicineIsDosaged ? Number(manualDoseAmount) || 1 : undefined,
       medicine_dose_unit: manualItemType === "medicine" && manualMedicineIsDosaged ? manualDoseUnit : undefined,
@@ -530,6 +402,7 @@ OCR text:\n${ocrTextInput}`;
     setManualMfgDate("");
     setManualExpiryDate("");
     setManualItemType("food");
+    setManualCategory("");
     setManualMedicineIsDosaged(false);
     setManualDoseAmount("");
     setManualDoseUnit("tablet");
@@ -539,17 +412,11 @@ OCR text:\n${ocrTextInput}`;
   };
 
   const handleCloseScanner = () => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
     if (photoIntervalRef.current) {
       clearInterval(photoIntervalRef.current);
       photoIntervalRef.current = null;
     }
-    stopScanning();
-    lastScannedRef.current = null;
-    scanCountRef.current.clear();
+    stopCamera();
     setMode("choice");
   };
 
@@ -569,26 +436,13 @@ OCR text:\n${ocrTextInput}`;
           >
             <div className="text-center mb-8">
               <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Barcode className="w-10 h-10 text-primary" />
+                <Camera className="w-10 h-10 text-primary" />
               </div>
               <h2 className="text-2xl font-semibold text-foreground mb-2">Add Items</h2>
-              <p className="text-muted-foreground">Scan a barcode or enter manually</p>
+              <p className="text-muted-foreground">Photo scan or enter manually</p>
             </div>
 
             <div className="w-full max-w-sm mx-auto space-y-4">
-              <GlassCard
-                onClick={() => setMode("scan")}
-                className="flex items-center gap-4 cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Scan Barcode</h3>
-                  <p className="text-sm text-muted-foreground">Use camera to scan product</p>
-                </div>
-              </GlassCard>
-
               <GlassCard
                 onClick={() => setMode("manual")}
                 className="flex items-center gap-4 cursor-pointer"
@@ -602,21 +456,201 @@ OCR text:\n${ocrTextInput}`;
                 </div>
               </GlassCard>
 
-              {PHOTO_SCAN_BETA && (
-                <GlassCard
-                  onClick={() => setMode("photo")}
-                  className="flex items-center gap-4 cursor-pointer"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
-                    <Camera className="w-6 h-6 text-destructive" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">Photo Scan (Beta)</h3>
-                    <p className="text-sm text-muted-foreground">Captures a photo every 5s and extracts dates</p>
-                  </div>
-                </GlassCard>
-              )}
+              <GlassCard
+                onClick={() => setMode("photo")}
+                className="flex items-center gap-4 cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-destructive" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">AI Photo Scan</h3>
+                  <p className="text-sm text-muted-foreground">Extracts name, dates, and category</p>
+                </div>
+              </GlassCard>
             </div>
+          </motion.div>
+        )}
+
+        {mode === "manual" && (
+          <motion.div
+            key="manual"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="w-full max-w-sm mx-auto"
+          >
+            <GlassCard className="p-6">
+              <h3 className="text-xl font-semibold text-foreground mb-4 text-center">
+                Add Item Manually
+              </h3>
+
+              <form onSubmit={handleManualSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Item Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="e.g., Organic Milk"
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="type">Type</Label>
+                  <select
+                    id="type"
+                    value={manualItemType}
+                    onChange={(e) => setManualItemType(e.target.value as "food" | "medicine")}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="food">Food</option>
+                    <option value="medicine">Medicine</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <select
+                    id="category"
+                    value={manualCategory}
+                    onChange={(e) => setManualCategory(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">None</option>
+                    {CATEGORY_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="mfg">Mfg</Label>
+                  <Input
+                    id="mfg"
+                    type="date"
+                    value={manualMfgDate}
+                    onChange={(e) => setManualMfgDate(e.target.value)}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="exp">Exp</Label>
+                  <Input
+                    id="exp"
+                    type="date"
+                    value={manualExpiryDate}
+                    onChange={(e) => setManualExpiryDate(e.target.value)}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </div>
+
+                {manualItemType === "medicine" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="dosaged">Medicine dosing</Label>
+                    <select
+                      id="dosaged"
+                      value={manualMedicineIsDosaged ? "dosaged" : "non"}
+                      onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="non">Non-dosaged medicine</option>
+                      <option value="dosaged">Dosaged medicine</option>
+                    </select>
+                  </div>
+                )}
+
+                {manualItemType === "medicine" && manualMedicineIsDosaged && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="doseAmount">Dose amount</Label>
+                        <Input
+                          id="doseAmount"
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={manualDoseAmount}
+                          onChange={(e) => setManualDoseAmount(e.target.value)}
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="doseUnit">Dose unit</Label>
+                        <Input
+                          id="doseUnit"
+                          value={manualDoseUnit}
+                          onChange={(e) => setManualDoseUnit(e.target.value)}
+                          placeholder="tablet / ml"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="doseTimes">Dose times (HH:MM, comma-separated)</Label>
+                      <Input
+                        id="doseTimes"
+                        value={manualDoseTimesRaw}
+                        onChange={(e) => setManualDoseTimesRaw(e.target.value)}
+                        placeholder="09:00, 21:00"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      value={manualQuantity}
+                      onChange={(e) => setManualQuantity(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit">Unit</Label>
+                    <select
+                      id="unit"
+                      value={manualUnit}
+                      onChange={(e) => setManualUnit(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="pcs">Pieces</option>
+                      <option value="kg">KG</option>
+                      <option value="g">Grams</option>
+                      <option value="ml">ML</option>
+                      <option value="l">Liters</option>
+                      <option value="pack-small">Small Pack</option>
+                      <option value="pack-medium">Medium Pack</option>
+                      <option value="pack-large">Large Pack</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Adding...
+                    </span>
+                  ) : (
+                    "Add Item"
+                  )}
+                </button>
+              </form>
+            </GlassCard>
           </motion.div>
         )}
 
@@ -675,6 +709,23 @@ OCR text:\n${ocrTextInput}`;
                   >
                     <option value="food">Food</option>
                     <option value="medicine">Medicine</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="photoCategory">Category</Label>
+                  <select
+                    id="photoCategory"
+                    value={manualCategory}
+                    onChange={(e) => setManualCategory(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">None</option>
+                    {CATEGORY_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -758,47 +809,63 @@ OCR text:\n${ocrTextInput}`;
                     onClick={() => void runPhotoOcrOnce()}
                     className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
                   >
-                    Re-scan
+                    {loading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Scanning...
+                      </span>
+                    ) : (
+                      "Rescan"
+                    )}
                   </button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+
+                  <button
                     type="button"
+                    disabled={loading || !(photoResult?.name || manualName) || !(photoResult?.mfg || manualMfgDate) || !(photoResult?.exp || manualExpiryDate)}
                     onClick={async () => {
-                      const name = manualName.trim();
-                      if (!name) return;
                       setLoading(true);
-                      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                      const doseTimes = manualItemType === "medicine" && manualMedicineIsDosaged ? parseDoseTimes(manualDoseTimesRaw) : [];
-                      const nextDoseAt = manualItemType === "medicine" && manualMedicineIsDosaged ? computeNextDoseAt(doseTimes) : undefined;
-                      await onAddItem({
-                        name,
-                        mfg: photoResult?.mfg,
-                        exp: photoResult?.exp,
-                        item_type: manualItemType,
-                        medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
-                        medicine_dose_amount: manualItemType === "medicine" && manualMedicineIsDosaged ? Number(manualDoseAmount) || 1 : undefined,
-                        medicine_dose_unit: manualItemType === "medicine" && manualMedicineIsDosaged ? manualDoseUnit : undefined,
-                        medicine_dose_times: manualItemType === "medicine" && manualMedicineIsDosaged ? doseTimes : undefined,
-                        medicine_timezone: manualItemType === "medicine" && manualMedicineIsDosaged ? tz : undefined,
-                        medicine_next_dose_at: manualItemType === "medicine" && manualMedicineIsDosaged ? nextDoseAt : undefined,
-                      });
-                      setLoading(false);
-                      setMode("choice");
-                      setManualName("");
-                      setManualItemType("food");
-                      setManualMedicineIsDosaged(false);
-                      setManualDoseAmount("");
-                      setManualDoseUnit("tablet");
-                      setManualDoseTimesRaw("09:00, 21:00");
-                      setPhotoResult(null);
-                      setOcrText("");
+                      try {
+                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        const doseTimes = manualItemType === "medicine" && manualMedicineIsDosaged ? parseDoseTimes(manualDoseTimesRaw) : [];
+                        const nextDoseAt = manualItemType === "medicine" && manualMedicineIsDosaged ? computeNextDoseAt(doseTimes) : undefined;
+
+                        await onAddItem({
+                          name: (photoResult?.name || manualName || "Scanned Item").trim(),
+                          mfg: (photoResult?.mfg || manualMfgDate || "").trim(),
+                          exp: (photoResult?.exp || manualExpiryDate || "").trim(),
+                          item_type: manualItemType,
+                          category: manualCategory.trim() || undefined,
+                          medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
+                          medicine_dose_amount: manualItemType === "medicine" && manualMedicineIsDosaged ? Number(manualDoseAmount) || 1 : undefined,
+                          medicine_dose_unit: manualItemType === "medicine" && manualMedicineIsDosaged ? manualDoseUnit : undefined,
+                          medicine_dose_times: manualItemType === "medicine" && manualMedicineIsDosaged ? doseTimes : undefined,
+                          medicine_timezone: manualItemType === "medicine" && manualMedicineIsDosaged ? tz : undefined,
+                          medicine_next_dose_at: manualItemType === "medicine" && manualMedicineIsDosaged ? nextDoseAt : undefined,
+                        });
+
+                        setManualName("");
+                        setManualQuantity("1");
+                        setManualUnit("pcs");
+                        setManualMfgDate("");
+                        setManualExpiryDate("");
+                        setManualItemType("food");
+                        setManualCategory("");
+                        setManualMedicineIsDosaged(false);
+                        setManualDoseAmount("");
+                        setManualDoseUnit("tablet");
+                        setManualDoseTimesRaw("09:00, 21:00");
+                        setMode("choice");
+                      } finally {
+                        setLoading(false);
+                      }
                     }}
-                    disabled={loading}
-                    className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+                    className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Add Item"}
-                  </motion.button>
+                    <span className="inline-flex items-center gap-2">
+                      <Check className="w-4 h-4" />
+                      Add
+                    </span>
+                  </button>
                 </div>
 
                 {ocrText && (
@@ -808,335 +875,6 @@ OCR text:\n${ocrTextInput}`;
                   </details>
                 )}
               </div>
-            </GlassCard>
-          </motion.div>
-        )}
-
-        {mode === "scan" && !scannedProduct && (
-          <motion.div
-            key="scan"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full max-w-sm mx-auto"
-          >
-            <div className="relative">
-              <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black">
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  muted
-                  autoPlay
-                />
-              </div>
-
-              {/* Scan overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-3/4 h-1/3 border-2 border-primary rounded-lg relative">
-                  <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-                  <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-                  <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-                  <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
-                </div>
-              </div>
-
-              {/* Loading indicator */}
-              {loading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-              )}
-
-              <button
-                onClick={handleCloseScanner}
-                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <p className="text-center text-muted-foreground mt-4">
-              Point camera at barcode or QR code
-            </p>
-          </motion.div>
-        )}
-
-        {scannedProduct && (
-          <motion.div
-            key="scanned"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="w-full max-w-sm mx-auto"
-          >
-            <GlassCard className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/20 flex items-center justify-center">
-                <Check className="w-8 h-8 text-success" />
-              </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">
-                {scannedProduct.name}
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Barcode: {scannedProduct.barcode}
-              </p>
-
-              <div className="space-y-3 text-left mb-4">
-                <div className="space-y-2">
-                  <Label htmlFor="scanType">Type</Label>
-                  <select
-                    id="scanType"
-                    value={manualItemType}
-                    onChange={(e) => setManualItemType(e.target.value as "food" | "medicine")}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="food">Food</option>
-                    <option value="medicine">Medicine</option>
-                  </select>
-                </div>
-
-                {manualItemType === "medicine" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="scanDosaged">Medicine dosing</Label>
-                    <select
-                      id="scanDosaged"
-                      value={manualMedicineIsDosaged ? "dosaged" : "non"}
-                      onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="non">Non-dosaged medicine</option>
-                      <option value="dosaged">Dosaged medicine</option>
-                    </select>
-                  </div>
-                )}
-
-                {manualItemType === "medicine" && manualMedicineIsDosaged && (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="scanDoseAmount">Dose amount</Label>
-                        <Input
-                          id="scanDoseAmount"
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={manualDoseAmount}
-                          onChange={(e) => setManualDoseAmount(e.target.value)}
-                          placeholder="1"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="scanDoseUnit">Dose unit</Label>
-                        <Input
-                          id="scanDoseUnit"
-                          value={manualDoseUnit}
-                          onChange={(e) => setManualDoseUnit(e.target.value)}
-                          placeholder="tablet / ml"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="scanDoseTimes">Dose times (HH:MM, comma-separated)</Label>
-                      <Input
-                        id="scanDoseTimes"
-                        value={manualDoseTimesRaw}
-                        onChange={(e) => setManualDoseTimesRaw(e.target.value)}
-                        placeholder="09:00, 21:00"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setScannedProduct(null);
-                    lastScannedRef.current = null;
-                    scanCountRef.current.clear();
-                  }}
-                  className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
-                >
-                  Cancel
-                </button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleAddScannedProduct}
-                  disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Add Item"}
-                </motion.button>
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
-
-        {mode === "manual" && (
-          <motion.div
-            key="manual"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="w-full max-w-sm mx-auto"
-          >
-            <GlassCard className="p-6">
-              <h3 className="text-xl font-semibold text-foreground mb-4 text-center">
-                Add Item Manually
-              </h3>
-
-              <form onSubmit={handleManualSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Item Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="e.g., Organic Milk"
-                    value={manualName}
-                    onChange={(e) => setManualName(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="itemType">Type</Label>
-                  <select
-                    id="itemType"
-                    value={manualItemType}
-                    onChange={(e) => setManualItemType(e.target.value as "food" | "medicine")}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="food">Food</option>
-                    <option value="medicine">Medicine</option>
-                  </select>
-                </div>
-
-                {manualItemType === "medicine" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="medicineDosaged">Medicine dosing</Label>
-                    <select
-                      id="medicineDosaged"
-                      value={manualMedicineIsDosaged ? "dosaged" : "non"}
-                      onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="non">Non-dosaged medicine</option>
-                      <option value="dosaged">Dosaged medicine</option>
-                    </select>
-                  </div>
-                )}
-
-                {manualItemType === "medicine" && manualMedicineIsDosaged && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="doseAmount">Dose amount</Label>
-                        <Input
-                          id="doseAmount"
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={manualDoseAmount}
-                          onChange={(e) => setManualDoseAmount(e.target.value)}
-                          placeholder="1"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="doseUnit">Dose unit</Label>
-                        <Input
-                          id="doseUnit"
-                          value={manualDoseUnit}
-                          onChange={(e) => setManualDoseUnit(e.target.value)}
-                          placeholder="tablet / ml"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="doseTimes">Dose times (HH:MM, comma-separated)</Label>
-                      <Input
-                        id="doseTimes"
-                        value={manualDoseTimesRaw}
-                        onChange={(e) => setManualDoseTimesRaw(e.target.value)}
-                        placeholder="09:00, 21:00"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="quantity">Quantity</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      min="1"
-                      placeholder="1"
-                      value={manualQuantity}
-                      onChange={(e) => setManualQuantity(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unit">Unit</Label>
-                    <select
-                      id="unit"
-                      value={manualUnit}
-                      onChange={(e) => setManualUnit(e.target.value)}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="pcs">Pieces</option>
-                      <option value="kg">KG</option>
-                      <option value="g">Grams</option>
-                      <option value="ml">ML</option>
-                      <option value="l">Liters</option>
-                      <option value="pack-small">Small Pack</option>
-                      <option value="pack-medium">Medium Pack</option>
-                      <option value="pack-large">Large Pack</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="mfg">Manufacturing Date</Label>
-                  <Input
-                    id="mfg"
-                    type="date"
-                    value={manualMfgDate}
-                    onChange={(e) => setManualMfgDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="exp">Expiry Date</Label>
-                  <Input
-                    id="exp"
-                    type="date"
-                    value={manualExpiryDate}
-                    onChange={(e) => setManualExpiryDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setMode("choice")}
-                    className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    disabled={loading || !manualName.trim() || !manualMfgDate.trim() || !manualExpiryDate.trim()}
-                    className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
-                  >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Add Item"}
-                  </motion.button>
-                </div>
-              </form>
             </GlassCard>
           </motion.div>
         )}
