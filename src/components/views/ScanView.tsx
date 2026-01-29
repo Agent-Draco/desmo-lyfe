@@ -626,6 +626,7 @@ OCR text:\n${ocrTextInput}`;
                       <option value="pcs">Pieces</option>
                       <option value="kg">KG</option>
                       <option value="g">Grams</option>
+                      <option value="mg">MG</option>
                       <option value="ml">ML</option>
                       <option value="l">Liters</option>
                       <option value="pack-small">Small Pack</option>
