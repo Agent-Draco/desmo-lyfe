@@ -94,6 +94,8 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const categories = useMemo(() => ["all", "food", "clothing", "electronics", "books", "household", "other"], []);
   const conditions = useMemo(() => ["new", "like-new", "good", "fair", "poor"], []);
@@ -177,19 +179,47 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
   };
 
   const createListing = async (formData: any) => {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      setError("User not authenticated. Please sign in to create a listing.");
+      return;
+    }
+    
     setLoading(true);
+    setError(null);
+    setSuccess(null);
+    
     try {
       const chosenMode: "s-comm" | "b-comm" = (formData?.mode ?? activeMode) as any;
-      const { error } = await vigilSupabase.from("listings").insert({
-        ...formData,
+      
+      // Prepare the data for insertion
+      const listingData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        condition: formData.condition,
         mode: chosenMode,
         lister_id: currentUserId,
         lister_name: household?.name || "Anonymous",
         status: "active",
-      });
+        item_name: formData.item_name || null,
+        quantity: formData.quantity || 1,
+        unit: formData.unit || null,
+        expiry_date: formData.expiry_date || null,
+      };
 
-      if (error) throw error;
+      const { data, error } = await vigilSupabase
+        .from("listings")
+        .insert(listingData)
+        .select();
+
+      if (error) {
+        console.error("Database error:", error);
+        setError(`Failed to create listing: ${error.message}`);
+        throw error;
+      }
+
+      console.log("Listing created successfully:", data);
+      setSuccess("Listing created successfully!");
 
       setShowCreateForm(false);
       setSelectedInventoryItem(null);
@@ -197,27 +227,42 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
       await fetchListings(chosenMode);
     } catch (error) {
       console.error("Error creating listing:", error);
+      setError("Failed to create listing. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const createRequest = async (listingId: string, message: string) => {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      console.error("User not authenticated");
+      return;
+    }
 
     try {
-      const { error } = await vigilSupabase.from("requests").insert({
+      const requestData = {
         listing_id: listingId,
         requester_id: currentUserId,
         requester_name: household?.name || "Anonymous",
-        message,
+        message: message.trim(),
         status: "pending",
-      });
+      };
 
-      if (error) throw error;
+      const { data, error } = await vigilSupabase
+        .from("requests")
+        .insert(requestData)
+        .select();
+
+      if (error) {
+        console.error("Database error:", error);
+        throw error;
+      }
+
+      console.log("Request created successfully:", data);
       await fetchRequests();
     } catch (error) {
       console.error("Error creating request:", error);
+      // You might want to show an error message to the user here
     }
   };
 
@@ -226,19 +271,29 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
     if (!newMessage.trim()) return;
 
     try {
-      const { error } = await vigilSupabase.from("messages").insert({
+      const messageData = {
         chat_id: selectedChat.id,
         sender_id: currentUserId,
         sender_name: household?.name || "Anonymous",
         content: newMessage.trim(),
-      });
+      };
 
-      if (error) throw error;
+      const { data, error } = await vigilSupabase
+        .from("messages")
+        .insert(messageData)
+        .select();
 
+      if (error) {
+        console.error("Database error:", error);
+        throw error;
+      }
+
+      console.log("Message sent successfully:", data);
       setNewMessage("");
       await fetchMessages(selectedChat.id);
     } catch (error) {
       console.error("Error sending message:", error);
+      // You might want to show an error message to the user here
     }
   };
 
@@ -266,6 +321,31 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
       <div className="glass-card p-6">
         <h1 className="text-2xl font-bold text-foreground mb-2">Community Marketplace</h1>
         <p className="text-muted-foreground">Share and exchange items with your community</p>
+        
+        {/* Error and Success Messages */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm">
+            {error}
+            <button 
+              onClick={() => setError(null)}
+              className="ml-2 text-red-400 hover:text-red-300"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        
+        {success && (
+          <div className="mt-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 text-sm">
+            {success}
+            <button 
+              onClick={() => setSuccess(null)}
+              className="ml-2 text-emerald-400 hover:text-emerald-300"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="glass-card p-2">

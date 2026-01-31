@@ -51,7 +51,7 @@ interface ScanViewProps {
 }
 
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
-  const [mode, setMode] = useState<"choice" | "manual" | "photo" | "cv">("choice");
+  const [mode, setMode] = useState<"choice" | "manual" | "photo" | "cvScan">("choice");
 
   const [manualName, setManualName] = useState("");
   const [manualQuantity, setManualQuantity] = useState("1");
@@ -66,9 +66,8 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [manualDoseTimesRaw, setManualDoseTimesRaw] = useState("09:00, 21:00");
   const [loading, setLoading] = useState(false);
   const [ocrText, setOcrText] = useState<string>("");
-  const [photoResult, setPhotoResult] = useState<{ name: string; mfg?: string; exp?: string } | null>(null);
-  const [cvResult, setCvResult] = useState<{ name: string; confidence: number } | null>(null);
-  const [cvFrame, setCvFrame] = useState<string | null>(null);
+  const [photoScanResult, setPhotoScanResult] = useState<{ name: string; mfg?: string; exp?: string } | null>(null);
+  const [cvScanResult, setCvScanResult] = useState<{ name: string; mfg?: string; exp?: string } | null>(null);
 
   const parseDoseTimes = (raw: string) => {
     const parts = raw
@@ -146,7 +145,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const photoIntervalRef = useRef<number | null>(null);
-  const cvIntervalRef = useRef<number | null>(null);
+  const cvScanIntervalRef = useRef<number | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const extractDates = (text: string) => {
@@ -341,7 +340,7 @@ OCR text:\n${ocrTextInput}`;
         setManualCategory(geminiParsed.category.trim());
       }
 
-      setPhotoResult({
+      setPhotoScanResult({
         name: finalName,
         mfg: geminiParsed.mfg ?? extracted.mfg,
         exp: geminiParsed.exp ?? extracted.exp,
@@ -353,7 +352,7 @@ OCR text:\n${ocrTextInput}`;
     }
   }, [manualName, manualItemType]);
 
-  const runCvDetectionOnce = useCallback(async () => {
+  const runCvScanOcrOnce = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
@@ -367,26 +366,68 @@ OCR text:\n${ocrTextInput}`;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
-    setCvFrame(`data:image/jpeg;base64,${base64}`);
-
     setLoading(true);
     try {
-      const result = await aiCvDetectProduct(base64);
-      if (result) {
-        // Only update UI if something was detected
-        setCvResult(result);
-        setManualName(result.name);
-        const guessed = guessItemType(result.name);
-        setManualItemType(guessed);
-        if (guessed === "food") setManualMedicineIsDosaged(false);
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
+
+      const { data } = await worker.recognize(canvas);
+      await worker.terminate();
+
+      const text = data?.text ?? "";
+      setOcrText(text);
+
+      const extracted = extractDates(text);
+
+      const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
+      
+      // Enhanced CV object identification using Google Vision
+      let visionName: string | undefined;
+      try {
+        const vision = await runGoogleVision(base64);
+        visionName = vision.name;
+      } catch (e) {
+        // ignore vision errors
       }
+
+      // CV OCR for date extraction using Gemini
+      let geminiParsed: { name?: string; mfg?: string; exp?: string; item_type?: "food" | "medicine"; category?: string } = {};
+      try {
+        geminiParsed = await runGeminiParse(text, visionName);
+      } catch (e) {
+        // ignore gemini errors
+      }
+
+      const finalName =
+        manualName.trim() ||
+        geminiParsed.name?.trim() ||
+        visionName?.trim() ||
+        "CV Scanned Item";
+
+      if (!manualName.trim() && finalName && finalName !== "CV Scanned Item") {
+        setManualName(finalName);
+      }
+
+      if (geminiParsed?.item_type && geminiParsed.item_type !== manualItemType) {
+        setManualItemType(geminiParsed.item_type);
+        if (geminiParsed.item_type === "food") setManualMedicineIsDosaged(false);
+      }
+
+      if (typeof geminiParsed?.category === "string" && geminiParsed.category.trim()) {
+        setManualCategory(geminiParsed.category.trim());
+      }
+
+      setCvScanResult({
+        name: finalName,
+        mfg: geminiParsed.mfg ?? extracted.mfg,
+        exp: geminiParsed.exp ?? extracted.exp,
+      });
     } catch (err) {
-      console.error("CV detection failed:", err);
+      console.error("CV Scan OCR failed:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [manualName, manualItemType]);
 
   const stopCamera = useCallback(() => {
     const s = mediaStreamRef.current;
@@ -416,7 +457,7 @@ OCR text:\n${ocrTextInput}`;
     if (mode === "photo") {
       void startCamera();
       setOcrText("");
-      setPhotoResult(null);
+      setPhotoScanResult(null);
 
       photoIntervalRef.current = window.setInterval(() => {
         void runPhotoOcrOnce();
@@ -433,22 +474,22 @@ OCR text:\n${ocrTextInput}`;
   }, [mode, runPhotoOcrOnce, startCamera, stopCamera]);
 
   useEffect(() => {
-    if (mode === "cv") {
+    if (mode === "cvScan") {
       void startCamera();
-      // Run CV detection every 5 seconds
-      cvIntervalRef.current = window.setInterval(() => {
-        void runCvDetectionOnce();
+      // Run CV scan every 5 seconds
+      cvScanIntervalRef.current = window.setInterval(() => {
+        void runCvScanOcrOnce();
       }, 5000);
     }
 
     return () => {
-      if (cvIntervalRef.current) {
-        clearInterval(cvIntervalRef.current);
-        cvIntervalRef.current = null;
+      if (cvScanIntervalRef.current) {
+        clearInterval(cvScanIntervalRef.current);
+        cvScanIntervalRef.current = null;
       }
       stopCamera();
     };
-  }, [mode, runCvDetectionOnce, startCamera, stopCamera]);
+  }, [mode, runCvScanOcrOnce, startCamera, stopCamera]);
 
   const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -487,6 +528,7 @@ OCR text:\n${ocrTextInput}`;
     setManualDoseAmount("");
     setManualDoseUnit("tablet");
     setManualDoseTimesRaw("09:00, 21:00");
+    setCvScanResult(null);
     setMode("choice");
     setLoading(false);
   };
@@ -536,8 +578,7 @@ OCR text:\n${ocrTextInput}`;
     setManualDoseAmount("");
     setManualDoseUnit("tablet");
     setManualDoseTimesRaw("09:00, 21:00");
-    setCvResult(null);
-    setCvFrame(null);
+    setCvScanResult(null);
     setMode("choice");
     setLoading(false);
   };
@@ -592,15 +633,15 @@ OCR text:\n${ocrTextInput}`;
               </GlassCard>
 
               <GlassCard
-                onClick={() => setMode("cv")}
+                onClick={() => setMode("cvScan")}
                 className="flex items-center gap-4 cursor-pointer"
               >
-                <div className="w-12 h-12 rounded-xl bg-purple-10 flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-purple-600" />
+                <div className="w-12 h-12 rounded-xl bg-green-10 flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">AI CV Detect</h3>
-                  <p className="text-sm text-muted-foreground">Detect product and fill missing info</p>
+                  <h3 className="font-semibold text-foreground">CV Scan</h3>
+                  <p className="text-sm text-muted-foreground">CV object identification & OCR for dates</p>
                 </div>
               </GlassCard>
             </div>
@@ -923,8 +964,8 @@ OCR text:\n${ocrTextInput}`;
                     <Label htmlFor="photoMfg">Mfg</Label>
                     <Input
                       id="photoMfg"
-                      value={photoResult?.mfg ?? ""}
-                      onChange={(e) => setPhotoResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), mfg: e.target.value }))}
+                      value={photoScanResult?.mfg ?? ""}
+                      onChange={(e) => setPhotoScanResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), mfg: e.target.value }))}
                       placeholder="YYYY-MM-DD"
                     />
                   </div>
@@ -932,8 +973,8 @@ OCR text:\n${ocrTextInput}`;
                     <Label htmlFor="photoExp">Exp</Label>
                     <Input
                       id="photoExp"
-                      value={photoResult?.exp ?? ""}
-                      onChange={(e) => setPhotoResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), exp: e.target.value }))}
+                      value={photoScanResult?.exp ?? ""}
+                      onChange={(e) => setPhotoScanResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), exp: e.target.value }))}
                       placeholder="YYYY-MM-DD"
                     />
                   </div>
@@ -957,7 +998,7 @@ OCR text:\n${ocrTextInput}`;
 
                   <button
                     type="button"
-                    disabled={loading || !(photoResult?.name || manualName) || !(photoResult?.mfg || manualMfgDate) || !(photoResult?.exp || manualExpiryDate)}
+                    disabled={loading || !(photoScanResult?.name || manualName) || !(photoScanResult?.mfg || manualMfgDate) || !(photoScanResult?.exp || manualExpiryDate)}
                     onClick={async () => {
                       setLoading(true);
                       try {
@@ -966,9 +1007,9 @@ OCR text:\n${ocrTextInput}`;
                         const nextDoseAt = manualItemType === "medicine" && manualMedicineIsDosaged ? computeNextDoseAt(doseTimes) : undefined;
 
                         await onAddItem({
-                          name: (photoResult?.name || manualName || "Scanned Item").trim(),
-                          mfg: (photoResult?.mfg || manualMfgDate || "").trim(),
-                          exp: (photoResult?.exp || manualExpiryDate || "").trim(),
+                          name: (photoScanResult?.name || manualName || "Scanned Item").trim(),
+                          mfg: (photoScanResult?.mfg || manualMfgDate || "").trim(),
+                          exp: (photoScanResult?.exp || manualExpiryDate || "").trim(),
                           item_type: manualItemType,
                           category: manualCategory.trim() || undefined,
                           medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
