@@ -118,30 +118,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return "food";
   };
 
-  const aiCvDetectProduct = async (imageBase64: string): Promise<{ name: string; confidence: number } | null> => {
-    // Mock AI CV detection: simulate network delay and random confidence/product
-    await new Promise((r) => setTimeout(r, 1200));
-    
-    // 30% chance of detecting nothing
-    if (Math.random() < 0.3) {
-      return null;
-    }
-    
-    const mockProducts = [
-      "Organic Whole Milk",
-      "Whole Wheat Bread",
-      "Amoxicillin 500mg",
-      "Ibuprofen Tablets",
-      "Greek Yogurt",
-      "Orange Juice",
-      "Paracetamol 650mg",
-      "Olive Oil Extra Virgin",
-    ];
-    const name = mockProducts[Math.floor(Math.random() * mockProducts.length)];
-    const confidence = 0.6 + Math.random() * 0.38; // 0.6–0.98
-    return { name, confidence };
-  };
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const photoIntervalRef = useRef<number | null>(null);
@@ -621,7 +597,7 @@ OCR text:\n${ocrTextInput}`;
 
               <GlassCard
                 onClick={() => setMode("photo")}
-                className="flex items-center gap-4 cursor-pointer"
+                className="flex items-center gap-4 cursor-pointer opacity-60"
               >
                 <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
                   <Camera className="w-6 h-6 text-destructive" />
@@ -629,12 +605,13 @@ OCR text:\n${ocrTextInput}`;
                 <div>
                   <h3 className="font-semibold text-foreground">AI Photo Scan</h3>
                   <p className="text-sm text-muted-foreground">Extracts name, dates, and category</p>
+                  <div className="text-xs text-amber-500 mt-1">🚧 Under Development</div>
                 </div>
               </GlassCard>
 
               <GlassCard
                 onClick={() => setMode("cvScan")}
-                className="flex items-center gap-4 cursor-pointer"
+                className="flex items-center gap-4 cursor-pointer opacity-60"
               >
                 <div className="w-12 h-12 rounded-xl bg-green-10 flex items-center justify-center">
                   <Camera className="w-6 h-6 text-green-600" />
@@ -642,6 +619,7 @@ OCR text:\n${ocrTextInput}`;
                 <div>
                   <h3 className="font-semibold text-foreground">CV Scan</h3>
                   <p className="text-sm text-muted-foreground">CV object identification & OCR for dates</p>
+                  <div className="text-xs text-amber-500 mt-1">🚧 Under Development</div>
                 </div>
               </GlassCard>
             </div>
@@ -1056,9 +1034,9 @@ OCR text:\n${ocrTextInput}`;
           </motion.div>
         )}
 
-        {mode === "cv" && (
+        {mode === "cvScan" && (
           <motion.div
-            key="cv"
+            key="cvScan"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1084,8 +1062,7 @@ OCR text:\n${ocrTextInput}`;
               <button
                 onClick={() => {
                   stopCamera();
-                  setCvResult(null);
-                  setCvFrame(null);
+                  setCvScanResult(null);
                   setMode("choice");
                 }}
                 className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white"
@@ -1096,23 +1073,20 @@ OCR text:\n${ocrTextInput}`;
 
             <GlassCard className="p-4 mt-4">
               <div className="space-y-3">
-                {cvResult && (
+                {cvScanResult && (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">Detected:</p>
+                    <p className="text-sm font-medium text-foreground">CV Detected:</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{cvResult.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        ({Math.round(cvResult.confidence * 100)}% confidence)
-                      </span>
+                      <span className="text-lg">{cvScanResult.name}</span>
                     </div>
                   </div>
                 )}
 
                 <form onSubmit={handleCvSubmit} className="space-y-3">
                   <div className="space-y-2">
-                    <Label htmlFor="cvName">Product Name</Label>
+                    <Label htmlFor="cvScanName">Product Name</Label>
                     <Input
-                      id="cvName"
+                      id="cvScanName"
                       value={manualName}
                       onChange={(e) => setManualName(e.target.value)}
                       placeholder="Product name"
@@ -1121,9 +1095,9 @@ OCR text:\n${ocrTextInput}`;
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cvType">Type</Label>
+                    <Label htmlFor="cvScanType">Type</Label>
                     <select
-                      id="cvType"
+                      id="cvScanType"
                       value={manualItemType}
                       onChange={(e) => setManualItemType(e.target.value as "food" | "medicine")}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1134,9 +1108,9 @@ OCR text:\n${ocrTextInput}`;
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cvCategory">Category</Label>
+                    <Label htmlFor="cvScanCategory">Category</Label>
                     <select
-                      id="cvCategory"
+                      id="cvScanCategory"
                       value={manualCategory}
                       onChange={(e) => setManualCategory(e.target.value)}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1152,30 +1126,36 @@ OCR text:\n${ocrTextInput}`;
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor="cvMfg">Mfg</Label>
+                      <Label htmlFor="cvScanMfg">Mfg</Label>
                       <Input
-                        id="cvMfg"
+                        id="cvScanMfg"
                         type="date"
-                        value={manualMfgDate}
-                        onChange={(e) => setManualMfgDate(e.target.value)}
+                        value={cvScanResult?.mfg ?? manualMfgDate}
+                        onChange={(e) => {
+                          setManualMfgDate(e.target.value);
+                          setCvScanResult((p) => ({ ...(p ?? { name: manualName || "CV Scanned Item" }), mfg: e.target.value }));
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="cvExp">Exp</Label>
+                      <Label htmlFor="cvScanExp">Exp</Label>
                       <Input
-                        id="cvExp"
+                        id="cvScanExp"
                         type="date"
-                        value={manualExpiryDate}
-                        onChange={(e) => setManualExpiryDate(e.target.value)}
+                        value={cvScanResult?.exp ?? manualExpiryDate}
+                        onChange={(e) => {
+                          setManualExpiryDate(e.target.value);
+                          setCvScanResult((p) => ({ ...(p ?? { name: manualName || "CV Scanned Item" }), exp: e.target.value }));
+                        }}
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor="cvQuantity">Quantity</Label>
+                      <Label htmlFor="cvScanQuantity">Quantity</Label>
                       <Input
-                        id="cvQuantity"
+                        id="cvScanQuantity"
                         type="number"
                         min="1"
                         value={manualQuantity}
@@ -1183,9 +1163,9 @@ OCR text:\n${ocrTextInput}`;
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="cvUnit">Unit</Label>
+                      <Label htmlFor="cvScanUnit">Unit</Label>
                       <select
-                        id="cvUnit"
+                        id="cvScanUnit"
                         value={manualUnit}
                         onChange={(e) => setManualUnit(e.target.value)}
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1205,9 +1185,9 @@ OCR text:\n${ocrTextInput}`;
 
                   {manualItemType === "medicine" && (
                     <div className="space-y-2">
-                      <Label htmlFor="cvMedicineDosaged">Medicine dosing</Label>
+                      <Label htmlFor="cvScanMedicineDosaged">Medicine dosing</Label>
                       <select
-                        id="cvMedicineDosaged"
+                        id="cvScanMedicineDosaged"
                         value={manualMedicineIsDosaged ? "dosaged" : "non"}
                         onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1222,9 +1202,9 @@ OCR text:\n${ocrTextInput}`;
                     <>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label htmlFor="cvDoseAmount">Dose amount</Label>
+                          <Label htmlFor="cvScanDoseAmount">Dose amount</Label>
                           <Input
-                            id="cvDoseAmount"
+                            id="cvScanDoseAmount"
                             type="number"
                             min="0"
                             step="0.5"
@@ -1234,9 +1214,9 @@ OCR text:\n${ocrTextInput}`;
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="cvDoseUnit">Dose unit</Label>
+                          <Label htmlFor="cvScanDoseUnit">Dose unit</Label>
                           <Input
-                            id="cvDoseUnit"
+                            id="cvScanDoseUnit"
                             value={manualDoseUnit}
                             onChange={(e) => setManualDoseUnit(e.target.value)}
                             placeholder="tablet / ml"
@@ -1245,9 +1225,9 @@ OCR text:\n${ocrTextInput}`;
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="cvDoseTimes">Dose times (HH:MM, comma-separated)</Label>
+                        <Label htmlFor="cvScanDoseTimes">Dose times (HH:MM, comma-separated)</Label>
                         <Input
-                          id="cvDoseTimes"
+                          id="cvScanDoseTimes"
                           value={manualDoseTimesRaw}
                           onChange={(e) => setManualDoseTimesRaw(e.target.value)}
                           placeholder="09:00, 21:00"
@@ -1259,16 +1239,16 @@ OCR text:\n${ocrTextInput}`;
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => void runCvDetectionOnce()}
+                      onClick={() => void runCvScanOcrOnce()}
                       className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
                     >
                       {loading ? (
                         <span className="inline-flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Detecting…
+                          CV Scanning…
                         </span>
                       ) : (
-                        "Detect"
+                        "Rescan"
                       )}
                     </button>
 
@@ -1284,6 +1264,13 @@ OCR text:\n${ocrTextInput}`;
                     </button>
                   </div>
                 </form>
+
+                {ocrText && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">CV OCR text</summary>
+                    <pre className="mt-2 whitespace-pre-wrap">{ocrText}</pre>
+                  </details>
+                )}
               </div>
             </GlassCard>
           </motion.div>
