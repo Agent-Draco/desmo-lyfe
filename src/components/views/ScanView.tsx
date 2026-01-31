@@ -119,9 +119,15 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return "food";
   };
 
-  const aiCvDetectProduct = async (imageBase64: string): Promise<{ name: string; confidence: number }> => {
+  const aiCvDetectProduct = async (imageBase64: string): Promise<{ name: string; confidence: number } | null> => {
     // Mock AI CV detection: simulate network delay and random confidence/product
     await new Promise((r) => setTimeout(r, 1200));
+    
+    // 30% chance of detecting nothing
+    if (Math.random() < 0.3) {
+      return null;
+    }
+    
     const mockProducts = [
       "Organic Whole Milk",
       "Whole Wheat Bread",
@@ -140,6 +146,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const photoIntervalRef = useRef<number | null>(null);
+  const cvIntervalRef = useRef<number | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const extractDates = (text: string) => {
@@ -366,11 +373,14 @@ OCR text:\n${ocrTextInput}`;
     setLoading(true);
     try {
       const result = await aiCvDetectProduct(base64);
-      setCvResult(result);
-      setManualName(result.name);
-      const guessed = guessItemType(result.name);
-      setManualItemType(guessed);
-      if (guessed === "food") setManualMedicineIsDosaged(false);
+      if (result) {
+        // Only update UI if something was detected
+        setCvResult(result);
+        setManualName(result.name);
+        const guessed = guessItemType(result.name);
+        setManualItemType(guessed);
+        if (guessed === "food") setManualMedicineIsDosaged(false);
+      }
     } catch (err) {
       console.error("CV detection failed:", err);
     } finally {
@@ -425,12 +435,20 @@ OCR text:\n${ocrTextInput}`;
   useEffect(() => {
     if (mode === "cv") {
       void startCamera();
+      // Run CV detection every 5 seconds
+      cvIntervalRef.current = window.setInterval(() => {
+        void runCvDetectionOnce();
+      }, 5000);
     }
 
     return () => {
+      if (cvIntervalRef.current) {
+        clearInterval(cvIntervalRef.current);
+        cvIntervalRef.current = null;
+      }
       stopCamera();
     };
-  }, [mode, startCamera, stopCamera]);
+  }, [mode, runCvDetectionOnce, startCamera, stopCamera]);
 
   const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();

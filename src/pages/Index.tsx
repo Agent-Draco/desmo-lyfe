@@ -16,6 +16,7 @@ import { FamilyView } from "@/components/views/FamilyView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { CommView } from "@/components/views/CommView";
 import { NudgesView } from "@/components/views/NudgesView";
+import FeedbackPage from "@/pages/Feedback";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useInventory } from "@/hooks/useInventory";
@@ -322,6 +323,8 @@ const Index = () => {
         return <NudgesView inventory={inventory} />;
       case "comm":
         return <CommView household={household} currentUserId={user?.id || null} inventory={inventory} />;
+      case "feedback":
+        return <FeedbackPage />;
       case "settings":
         return <SettingsView profile={profile} household={household} onSignOut={signOut} />;
       default:
