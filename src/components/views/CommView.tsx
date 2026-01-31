@@ -319,7 +319,10 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
   return (
     <div className="space-y-6">
       <div className="glass-card p-6">
-        <h1 className="text-2xl font-bold text-foreground mb-2">Community Marketplace</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-2xl font-bold text-foreground">Community Marketplace</h1>
+          <div className="text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full">🚧 Under Construction</div>
+        </div>
         <p className="text-muted-foreground">Share and exchange items with your community</p>
         
         {/* Error and Success Messages */}
