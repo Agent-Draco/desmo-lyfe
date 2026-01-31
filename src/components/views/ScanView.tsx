@@ -51,7 +51,7 @@ interface ScanViewProps {
 }
 
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
-  const [mode, setMode] = useState<"choice" | "manual" | "photo">("choice");
+  const [mode, setMode] = useState<"choice" | "manual" | "photo" | "cv">("choice");
 
   const [manualName, setManualName] = useState("");
   const [manualQuantity, setManualQuantity] = useState("1");
@@ -67,6 +67,8 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   const [loading, setLoading] = useState(false);
   const [ocrText, setOcrText] = useState<string>("");
   const [photoResult, setPhotoResult] = useState<{ name: string; mfg?: string; exp?: string } | null>(null);
+  const [cvResult, setCvResult] = useState<{ name: string; confidence: number } | null>(null);
+  const [cvFrame, setCvFrame] = useState<string | null>(null);
 
   const parseDoseTimes = (raw: string) => {
     const parts = raw
@@ -115,6 +117,24 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
       return "medicine";
     }
     return "food";
+  };
+
+  const aiCvDetectProduct = async (imageBase64: string): Promise<{ name: string; confidence: number }> => {
+    // Mock AI CV detection: simulate network delay and random confidence/product
+    await new Promise((r) => setTimeout(r, 1200));
+    const mockProducts = [
+      "Organic Whole Milk",
+      "Whole Wheat Bread",
+      "Amoxicillin 500mg",
+      "Ibuprofen Tablets",
+      "Greek Yogurt",
+      "Orange Juice",
+      "Paracetamol 650mg",
+      "Olive Oil Extra Virgin",
+    ];
+    const name = mockProducts[Math.floor(Math.random() * mockProducts.length)];
+    const confidence = 0.6 + Math.random() * 0.38; // 0.6–0.98
+    return { name, confidence };
   };
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -326,6 +346,38 @@ OCR text:\n${ocrTextInput}`;
     }
   }, [manualName, manualItemType]);
 
+  const runCvDetectionOnce = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
+    setCvFrame(`data:image/jpeg;base64,${base64}`);
+
+    setLoading(true);
+    try {
+      const result = await aiCvDetectProduct(base64);
+      setCvResult(result);
+      setManualName(result.name);
+      const guessed = guessItemType(result.name);
+      setManualItemType(guessed);
+      if (guessed === "food") setManualMedicineIsDosaged(false);
+    } catch (err) {
+      console.error("CV detection failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const stopCamera = useCallback(() => {
     const s = mediaStreamRef.current;
     if (s) {
@@ -369,6 +421,16 @@ OCR text:\n${ocrTextInput}`;
       stopCamera();
     };
   }, [mode, runPhotoOcrOnce, startCamera, stopCamera]);
+
+  useEffect(() => {
+    if (mode === "cv") {
+      void startCamera();
+    }
+
+    return () => {
+      stopCamera();
+    };
+  }, [mode, startCamera, stopCamera]);
 
   const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -420,6 +482,48 @@ OCR text:\n${ocrTextInput}`;
     setMode("choice");
   };
 
+  const handleCvSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!manualName.trim()) return;
+
+    setLoading(true);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const doseTimes = manualItemType === "medicine" && manualMedicineIsDosaged ? parseDoseTimes(manualDoseTimesRaw) : [];
+    const nextDoseAt = manualItemType === "medicine" && manualMedicineIsDosaged ? computeNextDoseAt(doseTimes) : undefined;
+
+    await onAddItem({
+      name: manualName.trim(),
+      quantity: parseInt(manualQuantity) || 1,
+      unit: manualUnit,
+      mfg: manualMfgDate.trim() || undefined,
+      exp: manualExpiryDate.trim() || undefined,
+      item_type: manualItemType,
+      category: manualCategory.trim() || undefined,
+      medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
+      medicine_dose_amount: manualItemType === "medicine" && manualMedicineIsDosaged ? Number(manualDoseAmount) || 1 : undefined,
+      medicine_dose_unit: manualItemType === "medicine" && manualMedicineIsDosaged ? manualDoseUnit : undefined,
+      medicine_dose_times: manualItemType === "medicine" && manualMedicineIsDosaged ? doseTimes : undefined,
+      medicine_timezone: manualItemType === "medicine" && manualMedicineIsDosaged ? tz : undefined,
+      medicine_next_dose_at: manualItemType === "medicine" && manualMedicineIsDosaged ? nextDoseAt : undefined,
+    });
+
+    setManualName("");
+    setManualQuantity("1");
+    setManualUnit("pcs");
+    setManualMfgDate("");
+    setManualExpiryDate("");
+    setManualItemType("food");
+    setManualCategory("");
+    setManualMedicineIsDosaged(false);
+    setManualDoseAmount("");
+    setManualDoseUnit("tablet");
+    setManualDoseTimesRaw("09:00, 21:00");
+    setCvResult(null);
+    setCvFrame(null);
+    setMode("choice");
+    setLoading(false);
+  };
+
   return (
     <section className="flex flex-col items-center justify-center min-h-[60vh]">
       {/* Hidden canvas for image processing */}
@@ -466,6 +570,19 @@ OCR text:\n${ocrTextInput}`;
                 <div>
                   <h3 className="font-semibold text-foreground">AI Photo Scan</h3>
                   <p className="text-sm text-muted-foreground">Extracts name, dates, and category</p>
+                </div>
+              </GlassCard>
+
+              <GlassCard
+                onClick={() => setMode("cv")}
+                className="flex items-center gap-4 cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-xl bg-purple-10 flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">AI CV Detect</h3>
+                  <p className="text-sm text-muted-foreground">Detect product and fill missing info</p>
                 </div>
               </GlassCard>
             </div>
@@ -875,6 +992,239 @@ OCR text:\n${ocrTextInput}`;
                     <pre className="mt-2 whitespace-pre-wrap">{ocrText}</pre>
                   </details>
                 )}
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+
+        {mode === "cv" && (
+          <motion.div
+            key="cv"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="w-full max-w-sm mx-auto"
+          >
+            <div className="relative">
+              <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                  autoPlay
+                />
+              </div>
+
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  stopCamera();
+                  setCvResult(null);
+                  setCvFrame(null);
+                  setMode("choice");
+                }}
+                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <GlassCard className="p-4 mt-4">
+              <div className="space-y-3">
+                {cvResult && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Detected:</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{cvResult.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({Math.round(cvResult.confidence * 100)}% confidence)
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleCvSubmit} className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="cvName">Product Name</Label>
+                    <Input
+                      id="cvName"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="Product name"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cvType">Type</Label>
+                    <select
+                      id="cvType"
+                      value={manualItemType}
+                      onChange={(e) => setManualItemType(e.target.value as "food" | "medicine")}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="food">Food</option>
+                      <option value="medicine">Medicine</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cvCategory">Category</Label>
+                    <select
+                      id="cvCategory"
+                      value={manualCategory}
+                      onChange={(e) => setManualCategory(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">None</option>
+                      {CATEGORY_OPTIONS.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="cvMfg">Mfg</Label>
+                      <Input
+                        id="cvMfg"
+                        type="date"
+                        value={manualMfgDate}
+                        onChange={(e) => setManualMfgDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cvExp">Exp</Label>
+                      <Input
+                        id="cvExp"
+                        type="date"
+                        value={manualExpiryDate}
+                        onChange={(e) => setManualExpiryDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="cvQuantity">Quantity</Label>
+                      <Input
+                        id="cvQuantity"
+                        type="number"
+                        min="1"
+                        value={manualQuantity}
+                        onChange={(e) => setManualQuantity(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cvUnit">Unit</Label>
+                      <select
+                        id="cvUnit"
+                        value={manualUnit}
+                        onChange={(e) => setManualUnit(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="pcs">Pieces</option>
+                        <option value="kg">KG</option>
+                        <option value="g">Grams</option>
+                        <option value="mg">MG</option>
+                        <option value="ml">ML</option>
+                        <option value="l">Liters</option>
+                        <option value="pack-small">Small Pack</option>
+                        <option value="pack-medium">Medium Pack</option>
+                        <option value="pack-large">Large Pack</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {manualItemType === "medicine" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="cvMedicineDosaged">Medicine dosing</Label>
+                      <select
+                        id="cvMedicineDosaged"
+                        value={manualMedicineIsDosaged ? "dosaged" : "non"}
+                        onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="non">Non-dosaged medicine</option>
+                        <option value="dosaged">Dosaged medicine</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {manualItemType === "medicine" && manualMedicineIsDosaged && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="cvDoseAmount">Dose amount</Label>
+                          <Input
+                            id="cvDoseAmount"
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={manualDoseAmount}
+                            onChange={(e) => setManualDoseAmount(e.target.value)}
+                            placeholder="1"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cvDoseUnit">Dose unit</Label>
+                          <Input
+                            id="cvDoseUnit"
+                            value={manualDoseUnit}
+                            onChange={(e) => setManualDoseUnit(e.target.value)}
+                            placeholder="tablet / ml"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cvDoseTimes">Dose times (HH:MM, comma-separated)</Label>
+                        <Input
+                          id="cvDoseTimes"
+                          value={manualDoseTimesRaw}
+                          onChange={(e) => setManualDoseTimesRaw(e.target.value)}
+                          placeholder="09:00, 21:00"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void runCvDetectionOnce()}
+                      className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
+                    >
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Detecting…
+                        </span>
+                      ) : (
+                        "Detect"
+                      )}
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={loading || !manualName.trim()}
+                      className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Check className="w-4 h-4" />
+                        Add
+                      </span>
+                    </button>
+                  </div>
+                </form>
               </div>
             </GlassCard>
           </motion.div>
