@@ -162,11 +162,8 @@ const Auth = () => {
   const handleAppleLogin = async () => {
     setSocialLoading("apple");
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: window.location.origin,
-        },
+      const { error } = await lovable.auth.signInWithOAuth("apple", {
+        redirect_uri: window.location.origin,
       });
       if (error) throw error;
     } catch (error: any) {
