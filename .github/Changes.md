@@ -62,4 +62,10 @@
 - Commit 257d93ff9505c77be0bb8939c7d0bba9da427179
 - Commit ed03bb36a4972bbbea03b310d934890e99f3bf7b
 
-## Jules edits
+## Jules
+
+- Refactored `ScanView` to use Google Vision OCR (text detection).
+- Integrated Google Vision OCR results with Gemini API for smart parsing of item details.
+- Removed dependencies: `tesseract.js`, `@google-cloud/vision`.
+- Smoothened code by removing duplicated logic between "Photo" and "CV Scan" modes.
+- Fixed linting errors in `ScanView.tsx` and removed "Under Development" badges.
