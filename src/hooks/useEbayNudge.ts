@@ -36,9 +36,6 @@ export const useEbayNudge = (items: InventoryItem[]): EbayNudgeResult => {
         const item1 = electronics[i];
         const item2 = electronics[j];
 
-        // Skip if both are new or both are not new
-        if (item1.state === item2.state) continue;
-
         const name1 = item1.name.toLowerCase();
         const name2 = item2.name.toLowerCase();
 
@@ -46,9 +43,11 @@ export const useEbayNudge = (items: InventoryItem[]): EbayNudgeResult => {
         const isSimilar = checkItemSimilarity(name1, name2);
 
         if (isSimilar) {
-          // Determine which is newer (by created_at or assume the one with 'new' state)
-          const newItem = item1.state === 'new' ? item1 : item2;
-          const oldItem = item1.state === 'new' ? item2 : item1;
+          // Determine which is newer by created_at date
+          const item1Date = new Date(item1.created_at).getTime();
+          const item2Date = new Date(item2.created_at).getTime();
+          const newItem = item1Date > item2Date ? item1 : item2;
+          const oldItem = item1Date > item2Date ? item2 : item1;
 
           setNudgeState({
             shouldShowNudge: true,

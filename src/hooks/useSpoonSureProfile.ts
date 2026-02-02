@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 export interface SpoonSureProfileRecord {
   id: string;
@@ -9,6 +8,9 @@ export interface SpoonSureProfileRecord {
   created_at: string;
   updated_at: string;
 }
+
+// Local storage key for SpoonSure profile
+const STORAGE_KEY = 'spoonsure_profile';
 
 export const useSpoonSureProfile = (userId: string | null) => {
   const [profile, setProfile] = useState<SpoonSureProfileRecord | null>(null);
@@ -20,47 +22,44 @@ export const useSpoonSureProfile = (userId: string | null) => {
       return;
     }
 
-    const fetchProfile = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("spoonsure_profiles")
-          .select("*")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (error) throw error;
-        setProfile((data as SpoonSureProfileRecord) ?? null);
-      } catch {
+    // Load profile from local storage (since table doesn't exist in DB)
+    setLoading(true);
+    try {
+      const stored = localStorage.getItem(`${STORAGE_KEY}_${userId}`);
+      if (stored) {
+        setProfile(JSON.parse(stored));
+      } else {
         setProfile(null);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    void fetchProfile();
+    } catch {
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
   const upsertProfile = async (updates: { diet?: string | null; allergies?: string[] }) => {
     if (!userId) return null;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("spoonsure_profiles")
-        .upsert(
-          {
-            user_id: userId,
-            diet: updates.diet ?? null,
-            allergies: updates.allergies ?? [],
-          },
-          { onConflict: "user_id" },
-        )
-        .select("*")
-        .single();
-
-      if (error) throw error;
-      setProfile(data as SpoonSureProfileRecord);
-      return data as SpoonSureProfileRecord;
+      const now = new Date().toISOString();
+      const existingProfile = profile;
+      
+      const newProfile: SpoonSureProfileRecord = {
+        id: existingProfile?.id || crypto.randomUUID(),
+        user_id: userId,
+        diet: updates.diet ?? existingProfile?.diet ?? null,
+        allergies: updates.allergies ?? existingProfile?.allergies ?? [],
+        created_at: existingProfile?.created_at || now,
+        updated_at: now,
+      };
+      
+      localStorage.setItem(`${STORAGE_KEY}_${userId}`, JSON.stringify(newProfile));
+      setProfile(newProfile);
+      return newProfile;
+    } catch (err) {
+      console.error('Error saving SpoonSure profile:', err);
+      return null;
     } finally {
       setLoading(false);
     }
