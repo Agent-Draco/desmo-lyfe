@@ -1,22 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { GlassNav } from "@/components/GlassNav";
 import { RemovalModeToggle } from "@/components/RemovalModeToggle";
 import { SuccessFlash } from "@/components/SuccessFlash";
-import { PopUpReminder } from "@/components/PopUpReminder";
-import { MedicineDoseReminder } from "@/components/MedicineDoseReminder";
-import { RecipeDrawer } from "@/components/RecipeDrawer";
 import { HomeView } from "@/components/views/HomeView";
-import { InventoryView } from "@/components/views/InventoryView";
-import { ShoppingListView } from "@/components/views/ShoppingListView";
-import { ScanView } from "@/components/views/ScanView";
-import { FamilyView } from "@/components/views/FamilyView";
-import { SettingsView } from "@/components/views/SettingsView";
-import { CommView } from "@/components/views/CommView";
-import { NudgesView } from "@/components/views/NudgesView";
-import FeedbackPage from "@/pages/Feedback";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useInventory } from "@/hooks/useInventory";
@@ -25,6 +14,26 @@ import { useExpiryNotifications } from "@/hooks/useExpiryNotifications";
 import { quickAddPresets } from "@/components/QuickAddPreset";
 import { Loader2 } from "lucide-react";
 import { vigilSupabase } from "@/integrations/vigil/client";
+
+// Lazy load less critical components for better initial load
+const PopUpReminder = lazy(() => import("@/components/PopUpReminder").then(m => ({ default: m.PopUpReminder })));
+const MedicineDoseReminder = lazy(() => import("@/components/MedicineDoseReminder").then(m => ({ default: m.MedicineDoseReminder })));
+const RecipeDrawer = lazy(() => import("@/components/RecipeDrawer").then(m => ({ default: m.RecipeDrawer })));
+const InventoryView = lazy(() => import("@/components/views/InventoryView").then(m => ({ default: m.InventoryView })));
+const ShoppingListView = lazy(() => import("@/components/views/ShoppingListView").then(m => ({ default: m.ShoppingListView })));
+const ScanView = lazy(() => import("@/components/views/ScanView").then(m => ({ default: m.ScanView })));
+const FamilyView = lazy(() => import("@/components/views/FamilyView").then(m => ({ default: m.FamilyView })));
+const SettingsView = lazy(() => import("@/components/views/SettingsView").then(m => ({ default: m.SettingsView })));
+const CommView = lazy(() => import("@/components/views/CommView").then(m => ({ default: m.CommView })));
+const NudgesView = lazy(() => import("@/components/views/NudgesView").then(m => ({ default: m.NudgesView })));
+const FeedbackPage = lazy(() => import("@/pages/Feedback"));
+
+// View loading fallback
+const ViewLoader = () => (
+  <div className="flex items-center justify-center py-20">
+    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+  </div>
+);
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("home");
@@ -300,33 +309,61 @@ const Index = () => {
         );
       case "inventory":
         return (
-          <InventoryView
-            inventory={inventory}
-            onItemClick={handleItemClick}
-            loading={inventoryLoading}
-          />
+          <Suspense fallback={<ViewLoader />}>
+            <InventoryView
+              inventory={inventory}
+              onItemClick={handleItemClick}
+              loading={inventoryLoading}
+            />
+          </Suspense>
         );
       case "shopping":
         return (
-          <ShoppingListView
-            shoppingList={shoppingList}
-            onAddItem={addShoppingItem}
-            onDeleteItem={deleteShoppingItem}
-            loading={shoppingListLoading}
-          />
+          <Suspense fallback={<ViewLoader />}>
+            <ShoppingListView
+              shoppingList={shoppingList}
+              onAddItem={addShoppingItem}
+              onDeleteItem={deleteShoppingItem}
+              loading={shoppingListLoading}
+            />
+          </Suspense>
         );
       case "scan":
-        return <ScanView onAddItem={handleAddItem} />;
+        return (
+          <Suspense fallback={<ViewLoader />}>
+            <ScanView onAddItem={handleAddItem} />
+          </Suspense>
+        );
       case "family":
-        return <FamilyView household={household} currentUserId={user?.id || null} />;
+        return (
+          <Suspense fallback={<ViewLoader />}>
+            <FamilyView household={household} currentUserId={user?.id || null} />
+          </Suspense>
+        );
       case "nudges":
-        return <NudgesView inventory={inventory} />;
+        return (
+          <Suspense fallback={<ViewLoader />}>
+            <NudgesView inventory={inventory} />
+          </Suspense>
+        );
       case "comm":
-        return <CommView household={household} currentUserId={user?.id || null} inventory={inventory} />;
+        return (
+          <Suspense fallback={<ViewLoader />}>
+            <CommView household={household} currentUserId={user?.id || null} inventory={inventory} />
+          </Suspense>
+        );
       case "feedback":
-        return <FeedbackPage />;
+        return (
+          <Suspense fallback={<ViewLoader />}>
+            <FeedbackPage />
+          </Suspense>
+        );
       case "settings":
-        return <SettingsView profile={profile} household={household} onSignOut={signOut} />;
+        return (
+          <Suspense fallback={<ViewLoader />}>
+            <SettingsView profile={profile} household={household} onSignOut={signOut} />
+          </Suspense>
+        );
       default:
         return null;
     }
@@ -398,27 +435,28 @@ const Index = () => {
       
       <GlassNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <PopUpReminder
-        isVisible={showReminder}
-        expiringItems={expiringItems}
-        onDismiss={() => setShowReminder(false)}
-        onAddToShoppingList={async (itemName) => {
-          // Add to shopping list
-          await addShoppingItem({ item_name: itemName, quantity: 1 });
-          setShowReminder(false);
-        }}
-        onSeeRecipes={(ingredient) => {
-          setRecipeIngredient(ingredient);
-          setShowReminder(false);
-        }}
-        commListings={commListings}
-      />
+      <Suspense fallback={null}>
+        <PopUpReminder
+          isVisible={showReminder}
+          expiringItems={expiringItems}
+          onDismiss={() => setShowReminder(false)}
+          onAddToShoppingList={async (itemName) => {
+            await addShoppingItem({ item_name: itemName, quantity: 1 });
+            setShowReminder(false);
+          }}
+          onSeeRecipes={(ingredient) => {
+            setRecipeIngredient(ingredient);
+            setShowReminder(false);
+          }}
+          commListings={commListings}
+        />
 
-      <RecipeDrawer
-        isOpen={Boolean(recipeIngredient)}
-        ingredient={recipeIngredient ?? ""}
-        onClose={() => setRecipeIngredient(null)}
-      />
+        <RecipeDrawer
+          isOpen={Boolean(recipeIngredient)}
+          ingredient={recipeIngredient ?? ""}
+          onClose={() => setRecipeIngredient(null)}
+        />
+      </Suspense>
     </div>
   );
 };

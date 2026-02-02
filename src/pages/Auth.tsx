@@ -172,6 +172,11 @@ const Auth = () => {
             src={asteriskLogo}
             alt="AsteRISK"
             className="w-72 h-72 mx-auto mb-2 object-contain"
+            width={288}
+            height={288}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
           />
         </div>
 
