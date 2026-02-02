@@ -47,7 +47,7 @@ interface ScanViewProps {
     medicine_dose_times?: string[];
     medicine_timezone?: string;
     medicine_next_dose_at?: string;
-  }) => Promise<boolean | null>;
+  }) => Promise<any>;
 }
 
 export const ScanView = ({ onAddItem }: ScanViewProps) => {
@@ -99,9 +99,29 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return next.toISOString();
   };
 
+  const guessItemType = (name: string): "food" | "medicine" => {
+    const n = name.toLowerCase();
+    if (
+      n.includes("tablet") ||
+      n.includes("capsule") ||
+      n.includes("syrup") ||
+      n.includes("ointment") ||
+      n.includes("cream") ||
+      n.includes("mg") ||
+      n.includes("ml") ||
+      n.includes("paracetam") ||
+      n.includes("ibuprofen") ||
+      n.includes("amox")
+    ) {
+      return "medicine";
+    }
+    return "food";
+  };
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scanIntervalRef = useRef<number | null>(null);
+  const photoIntervalRef = useRef<number | null>(null);
+  const cvScanIntervalRef = useRef<number | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const extractDates = (text: string) => {
@@ -122,7 +142,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     return { exp, mfg };
   };
 
-  const safeIsoDate = (raw: unknown) => {
+  const safeIsoDate = (raw: any) => {
     if (!raw || typeof raw !== "string") return undefined;
     const s = raw.trim();
     if (!s) return undefined;
@@ -138,7 +158,7 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   };
 
   const runGoogleVision = async (base64Jpeg: string) => {
-    if (!GOOGLE_VISION_API_KEY) return { name: undefined as string | undefined, text: "" };
+    if (!GOOGLE_VISION_API_KEY) return { name: undefined as string | undefined };
 
     const body = {
       requests: [
@@ -148,7 +168,6 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
             { type: "LABEL_DETECTION", maxResults: 5 },
             { type: "WEB_DETECTION", maxResults: 5 },
             { type: "LOGO_DETECTION", maxResults: 3 },
-            { type: "TEXT_DETECTION", maxResults: 1 },
           ],
         },
       ],
@@ -164,20 +183,18 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
     );
 
     if (!res.ok) throw new Error(`Google Vision error: ${res.status}`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const json: any = await res.json();
     const first = json?.responses?.[0];
 
     const webBest = first?.webDetection?.bestGuessLabels?.[0]?.label as string | undefined;
     const logo = first?.logoAnnotations?.[0]?.description as string | undefined;
     const label = first?.labelAnnotations?.[0]?.description as string | undefined;
-    const fullText = first?.textAnnotations?.[0]?.description as string | undefined;
 
     const name = webBest || logo || label;
-    return { name, text: fullText || "" };
+    return { name };
   };
 
-  const runGeminiParse = useCallback(async (
+  const runGeminiParse = async (
     ocrTextInput: string,
     visionHint?: string
   ): Promise<{
@@ -189,11 +206,11 @@ export const ScanView = ({ onAddItem }: ScanViewProps) => {
   }> => {
     if (!GEMINI_API_KEY) {
       return {
-        name: undefined,
-        mfg: undefined,
-        exp: undefined,
-        item_type: undefined,
-        category: undefined,
+        name: undefined as string | undefined,
+        mfg: undefined as string | undefined,
+        exp: undefined as string | undefined,
+        item_type: undefined as "food" | "medicine" | undefined,
+        category: undefined as string | undefined,
       };
     }
 
@@ -235,9 +252,9 @@ OCR text:\n${ocrTextInput}`;
     } catch {
       return { name: undefined, mfg: undefined, exp: undefined, item_type: undefined, category: undefined };
     }
-  }, []);
+  };
 
-  const runScan = useCallback(async () => {
+  const runPhotoOcrOnce = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
@@ -253,36 +270,40 @@ OCR text:\n${ocrTextInput}`;
 
     setLoading(true);
     try {
-      const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
 
-      let visionResult: { name?: string; text: string } = { text: "" };
+      const { data } = await worker.recognize(canvas);
+      await worker.terminate();
+
+      const text = data?.text ?? "";
+      setOcrText(text);
+
+      const extracted = extractDates(text);
+
+      const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
+      let visionName: string | undefined;
       try {
-        visionResult = await runGoogleVision(base64);
+        const vision = await runGoogleVision(base64);
+        visionName = vision.name;
       } catch (e) {
         // ignore vision errors
-        console.error("Google Vision API error", e);
       }
-
-      setOcrText(visionResult.text);
-
-      // Regex fallback extraction
-      const extracted = extractDates(visionResult.text);
 
       let geminiParsed: { name?: string; mfg?: string; exp?: string; item_type?: "food" | "medicine"; category?: string } = {};
       try {
-        geminiParsed = await runGeminiParse(visionResult.text, visionResult.name);
+        geminiParsed = await runGeminiParse(text, visionName);
       } catch (e) {
         // ignore gemini errors
-        console.error("Gemini API error", e);
       }
 
       const finalName =
         manualName.trim() ||
         geminiParsed.name?.trim() ||
-        visionResult.name?.trim() ||
-        (mode === "cvScan" ? "CV Scanned Item" : "Scanned Item");
+        visionName?.trim() ||
+        "Scanned Item";
 
-      if (!manualName.trim() && finalName && finalName !== "Scanned Item" && finalName !== "CV Scanned Item") {
+      if (!manualName.trim() && finalName && finalName !== "Scanned Item") {
         setManualName(finalName);
       }
 
@@ -295,24 +316,94 @@ OCR text:\n${ocrTextInput}`;
         setManualCategory(geminiParsed.category.trim());
       }
 
-      const result = {
+      setPhotoScanResult({
         name: finalName,
         mfg: geminiParsed.mfg ?? extracted.mfg,
         exp: geminiParsed.exp ?? extracted.exp,
-      };
-
-      if (mode === "cvScan") {
-        setCvScanResult(result);
-      } else {
-        setPhotoScanResult(result);
-      }
-
+      });
     } catch (err) {
-      console.error("Scan failed:", err);
+      console.error("Photo OCR failed:", err);
     } finally {
       setLoading(false);
     }
-  }, [manualName, manualItemType, mode, runGeminiParse]);
+  }, [manualName, manualItemType]);
+
+  const runCvScanOcrOnce = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    setLoading(true);
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
+
+      const { data } = await worker.recognize(canvas);
+      await worker.terminate();
+
+      const text = data?.text ?? "";
+      setOcrText(text);
+
+      const extracted = extractDates(text);
+
+      const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
+
+      // Enhanced CV object identification using Google Vision
+      let visionName: string | undefined;
+      try {
+        const vision = await runGoogleVision(base64);
+        visionName = vision.name;
+      } catch (e) {
+        // ignore vision errors
+      }
+
+      // CV OCR for date extraction using Gemini
+      let geminiParsed: { name?: string; mfg?: string; exp?: string; item_type?: "food" | "medicine"; category?: string } = {};
+      try {
+        geminiParsed = await runGeminiParse(text, visionName);
+      } catch (e) {
+        // ignore gemini errors
+      }
+
+      const finalName =
+        manualName.trim() ||
+        geminiParsed.name?.trim() ||
+        visionName?.trim() ||
+        "CV Scanned Item";
+
+      if (!manualName.trim() && finalName && finalName !== "CV Scanned Item") {
+        setManualName(finalName);
+      }
+
+      if (geminiParsed?.item_type && geminiParsed.item_type !== manualItemType) {
+        setManualItemType(geminiParsed.item_type);
+        if (geminiParsed.item_type === "food") setManualMedicineIsDosaged(false);
+      }
+
+      if (typeof geminiParsed?.category === "string" && geminiParsed.category.trim()) {
+        setManualCategory(geminiParsed.category.trim());
+      }
+
+      setCvScanResult({
+        name: finalName,
+        mfg: geminiParsed.mfg ?? extracted.mfg,
+        exp: geminiParsed.exp ?? extracted.exp,
+      });
+    } catch (err) {
+      console.error("CV Scan OCR failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [manualName, manualItemType]);
 
   const stopCamera = useCallback(() => {
     const s = mediaStreamRef.current;
@@ -329,40 +420,52 @@ OCR text:\n${ocrTextInput}`;
     if (mediaStreamRef.current) return;
     if (!videoRef.current) return;
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false,
-      });
-      mediaStreamRef.current = stream;
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-    } catch (e) {
-      console.error("Failed to start camera", e);
-    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false,
+    });
+    mediaStreamRef.current = stream;
+    videoRef.current.srcObject = stream;
+    await videoRef.current.play();
   }, []);
 
   useEffect(() => {
-    if (mode === "photo" || mode === "cvScan") {
+    if (mode === "photo") {
       void startCamera();
       setOcrText("");
       setPhotoScanResult(null);
-      setCvScanResult(null);
 
-      // Auto scan every 5 seconds
-      scanIntervalRef.current = window.setInterval(() => {
-        void runScan();
+      photoIntervalRef.current = window.setInterval(() => {
+        void runPhotoOcrOnce();
       }, 5000);
     }
 
     return () => {
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-        scanIntervalRef.current = null;
+      if (photoIntervalRef.current) {
+        clearInterval(photoIntervalRef.current);
+        photoIntervalRef.current = null;
       }
       stopCamera();
     };
-  }, [mode, runScan, startCamera, stopCamera]);
+  }, [mode, runPhotoOcrOnce, startCamera, stopCamera]);
+
+  useEffect(() => {
+    if (mode === "cvScan") {
+      void startCamera();
+      // Run CV scan every 5 seconds
+      cvScanIntervalRef.current = window.setInterval(() => {
+        void runCvScanOcrOnce();
+      }, 5000);
+    }
+
+    return () => {
+      if (cvScanIntervalRef.current) {
+        clearInterval(cvScanIntervalRef.current);
+        cvScanIntervalRef.current = null;
+      }
+      stopCamera();
+    };
+  }, [mode, runCvScanOcrOnce, startCamera, stopCamera]);
 
   const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -402,15 +505,14 @@ OCR text:\n${ocrTextInput}`;
     setManualDoseUnit("tablet");
     setManualDoseTimesRaw("09:00, 21:00");
     setCvScanResult(null);
-    setPhotoScanResult(null);
     setMode("choice");
     setLoading(false);
   };
 
   const handleCloseScanner = () => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
+    if (photoIntervalRef.current) {
+      clearInterval(photoIntervalRef.current);
+      photoIntervalRef.current = null;
     }
     stopCamera();
     setMode("choice");
@@ -453,7 +555,6 @@ OCR text:\n${ocrTextInput}`;
     setManualDoseUnit("tablet");
     setManualDoseTimesRaw("09:00, 21:00");
     setCvScanResult(null);
-    setPhotoScanResult(null);
     setMode("choice");
     setLoading(false);
   };
@@ -496,7 +597,7 @@ OCR text:\n${ocrTextInput}`;
 
               <GlassCard
                 onClick={() => setMode("photo")}
-                className="flex items-center gap-4 cursor-pointer opacity-90 hover:opacity-100 transition-opacity"
+                className="flex items-center gap-4 cursor-pointer opacity-60"
               >
                 <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
                   <Camera className="w-6 h-6 text-destructive" />
@@ -504,12 +605,13 @@ OCR text:\n${ocrTextInput}`;
                 <div>
                   <h3 className="font-semibold text-foreground">AI Photo Scan</h3>
                   <p className="text-sm text-muted-foreground">Extracts name, dates, and category</p>
+                  <div className="text-xs text-amber-500 mt-1">🚧 Under Development</div>
                 </div>
               </GlassCard>
 
               <GlassCard
                 onClick={() => setMode("cvScan")}
-                className="flex items-center gap-4 cursor-pointer opacity-90 hover:opacity-100 transition-opacity"
+                className="flex items-center gap-4 cursor-pointer opacity-60"
               >
                 <div className="w-12 h-12 rounded-xl bg-green-10 flex items-center justify-center">
                   <Camera className="w-6 h-6 text-green-600" />
@@ -517,6 +619,7 @@ OCR text:\n${ocrTextInput}`;
                 <div>
                   <h3 className="font-semibold text-foreground">CV Scan</h3>
                   <p className="text-sm text-muted-foreground">CV object identification & OCR for dates</p>
+                  <div className="text-xs text-amber-500 mt-1">🚧 Under Development</div>
                 </div>
               </GlassCard>
             </div>
@@ -706,9 +809,9 @@ OCR text:\n${ocrTextInput}`;
           </motion.div>
         )}
 
-        {(mode === "photo" || mode === "cvScan") && (
+        {mode === "photo" && (
           <motion.div
-            key="scan-interface"
+            key="photo"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -741,6 +844,235 @@ OCR text:\n${ocrTextInput}`;
 
             <GlassCard className="p-4 mt-4">
               <div className="space-y-3">
+                <div>
+                  <Label htmlFor="photoName">Item name</Label>
+                  <Input
+                    id="photoName"
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    placeholder="Type item name (OCR doesn’t reliably detect names yet)"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="photoItemType">Type</Label>
+                  <select
+                    id="photoItemType"
+                    value={manualItemType}
+                    onChange={(e) => setManualItemType(e.target.value as "food" | "medicine")}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="food">Food</option>
+                    <option value="medicine">Medicine</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="photoCategory">Category</Label>
+                  <select
+                    id="photoCategory"
+                    value={manualCategory}
+                    onChange={(e) => setManualCategory(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">None</option>
+                    {CATEGORY_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {manualItemType === "medicine" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="photoMedicineDosaged">Medicine dosing</Label>
+                    <select
+                      id="photoMedicineDosaged"
+                      value={manualMedicineIsDosaged ? "dosaged" : "non"}
+                      onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="non">Non-dosaged medicine</option>
+                      <option value="dosaged">Dosaged medicine</option>
+                    </select>
+                  </div>
+                )}
+
+                {manualItemType === "medicine" && manualMedicineIsDosaged && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="photoDoseAmount">Dose amount</Label>
+                        <Input
+                          id="photoDoseAmount"
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={manualDoseAmount}
+                          onChange={(e) => setManualDoseAmount(e.target.value)}
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="photoDoseUnit">Dose unit</Label>
+                        <Input
+                          id="photoDoseUnit"
+                          value={manualDoseUnit}
+                          onChange={(e) => setManualDoseUnit(e.target.value)}
+                          placeholder="tablet / ml"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="photoDoseTimes">Dose times (HH:MM, comma-separated)</Label>
+                      <Input
+                        id="photoDoseTimes"
+                        value={manualDoseTimesRaw}
+                        onChange={(e) => setManualDoseTimesRaw(e.target.value)}
+                        placeholder="09:00, 21:00"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="photoMfg">Mfg</Label>
+                    <Input
+                      id="photoMfg"
+                      value={photoScanResult?.mfg ?? ""}
+                      onChange={(e) => setPhotoScanResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), mfg: e.target.value }))}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="photoExp">Exp</Label>
+                    <Input
+                      id="photoExp"
+                      value={photoScanResult?.exp ?? ""}
+                      onChange={(e) => setPhotoScanResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), exp: e.target.value }))}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void runPhotoOcrOnce()}
+                    className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
+                  >
+                    {loading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Scanning...
+                      </span>
+                    ) : (
+                      "Rescan"
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading || !(photoScanResult?.name || manualName) || !(photoScanResult?.mfg || manualMfgDate) || !(photoScanResult?.exp || manualExpiryDate)}
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        const doseTimes = manualItemType === "medicine" && manualMedicineIsDosaged ? parseDoseTimes(manualDoseTimesRaw) : [];
+                        const nextDoseAt = manualItemType === "medicine" && manualMedicineIsDosaged ? computeNextDoseAt(doseTimes) : undefined;
+
+                        await onAddItem({
+                          name: (photoScanResult?.name || manualName || "Scanned Item").trim(),
+                          mfg: (photoScanResult?.mfg || manualMfgDate || "").trim(),
+                          exp: (photoScanResult?.exp || manualExpiryDate || "").trim(),
+                          item_type: manualItemType,
+                          category: manualCategory.trim() || undefined,
+                          medicine_is_dosaged: manualItemType === "medicine" ? manualMedicineIsDosaged : false,
+                          medicine_dose_amount: manualItemType === "medicine" && manualMedicineIsDosaged ? Number(manualDoseAmount) || 1 : undefined,
+                          medicine_dose_unit: manualItemType === "medicine" && manualMedicineIsDosaged ? manualDoseUnit : undefined,
+                          medicine_dose_times: manualItemType === "medicine" && manualMedicineIsDosaged ? doseTimes : undefined,
+                          medicine_timezone: manualItemType === "medicine" && manualMedicineIsDosaged ? tz : undefined,
+                          medicine_next_dose_at: manualItemType === "medicine" && manualMedicineIsDosaged ? nextDoseAt : undefined,
+                        });
+
+                        setManualName("");
+                        setManualQuantity("1");
+                        setManualUnit("pcs");
+                        setManualMfgDate("");
+                        setManualExpiryDate("");
+                        setManualItemType("food");
+                        setManualCategory("");
+                        setManualMedicineIsDosaged(false);
+                        setManualDoseAmount("");
+                        setManualDoseUnit("tablet");
+                        setManualDoseTimesRaw("09:00, 21:00");
+                        setMode("choice");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Check className="w-4 h-4" />
+                      Add
+                    </span>
+                  </button>
+                </div>
+
+                {ocrText && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">OCR text</summary>
+                    <pre className="mt-2 whitespace-pre-wrap">{ocrText}</pre>
+                  </details>
+                )}
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+
+        {mode === "cvScan" && (
+          <motion.div
+            key="cvScan"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="w-full max-w-sm mx-auto"
+          >
+            <div className="relative">
+              <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-black">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                  autoPlay
+                />
+              </div>
+
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  stopCamera();
+                  setCvScanResult(null);
+                  setMode("choice");
+                }}
+                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <GlassCard className="p-4 mt-4">
+              <div className="space-y-3">
                 {cvScanResult && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-foreground">CV Detected:</p>
@@ -750,30 +1082,22 @@ OCR text:\n${ocrTextInput}`;
                   </div>
                 )}
 
-                {photoScanResult && mode === "photo" && (
+                <form onSubmit={handleCvSubmit} className="space-y-3">
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">Photo Scan Result:</p>
-                    <div className="flex items-center gap-2">
-                       {/* This could be enhanced to show more details */}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="scanName">Item name</Label>
+                    <Label htmlFor="cvScanName">Product Name</Label>
                     <Input
-                      id="scanName"
+                      id="cvScanName"
                       value={manualName}
                       onChange={(e) => setManualName(e.target.value)}
                       placeholder="Product name"
+                      required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="scanType">Type</Label>
+                    <Label htmlFor="cvScanType">Type</Label>
                     <select
-                      id="scanType"
+                      id="cvScanType"
                       value={manualItemType}
                       onChange={(e) => setManualItemType(e.target.value as "food" | "medicine")}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -784,9 +1108,9 @@ OCR text:\n${ocrTextInput}`;
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="scanCategory">Category</Label>
+                    <Label htmlFor="cvScanCategory">Category</Label>
                     <select
-                      id="scanCategory"
+                      id="cvScanCategory"
                       value={manualCategory}
                       onChange={(e) => setManualCategory(e.target.value)}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -800,102 +1124,38 @@ OCR text:\n${ocrTextInput}`;
                     </select>
                   </div>
 
-                  {manualItemType === "medicine" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="scanMedicineDosaged">Medicine dosing</Label>
-                      <select
-                        id="scanMedicineDosaged"
-                        value={manualMedicineIsDosaged ? "dosaged" : "non"}
-                        onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <option value="non">Non-dosaged medicine</option>
-                        <option value="dosaged">Dosaged medicine</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {manualItemType === "medicine" && manualMedicineIsDosaged && (
-                    <>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="scanDoseAmount">Dose amount</Label>
-                          <Input
-                            id="scanDoseAmount"
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={manualDoseAmount}
-                            onChange={(e) => setManualDoseAmount(e.target.value)}
-                            placeholder="1"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="scanDoseUnit">Dose unit</Label>
-                          <Input
-                            id="scanDoseUnit"
-                            value={manualDoseUnit}
-                            onChange={(e) => setManualDoseUnit(e.target.value)}
-                            placeholder="tablet / ml"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="scanDoseTimes">Dose times (HH:MM, comma-separated)</Label>
-                        <Input
-                          id="scanDoseTimes"
-                          value={manualDoseTimesRaw}
-                          onChange={(e) => setManualDoseTimesRaw(e.target.value)}
-                          placeholder="09:00, 21:00"
-                        />
-                      </div>
-                    </>
-                  )}
-
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="scanMfg">Mfg</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="cvScanMfg">Mfg</Label>
                       <Input
-                        id="scanMfg"
-                        value={(mode === "photo" ? photoScanResult?.mfg : cvScanResult?.mfg) ?? manualMfgDate}
-                         onChange={(e) => {
-                          const val = e.target.value;
-                          setManualMfgDate(val);
-                          if (mode === "photo") {
-                            setPhotoScanResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), mfg: val }));
-                          } else {
-                            setCvScanResult((p) => ({ ...(p ?? { name: manualName || "CV Scanned Item" }), mfg: val }));
-                          }
+                        id="cvScanMfg"
+                        type="date"
+                        value={cvScanResult?.mfg ?? manualMfgDate}
+                        onChange={(e) => {
+                          setManualMfgDate(e.target.value);
+                          setCvScanResult((p) => ({ ...(p ?? { name: manualName || "CV Scanned Item" }), mfg: e.target.value }));
                         }}
-                        placeholder="YYYY-MM-DD"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="scanExp">Exp</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="cvScanExp">Exp</Label>
                       <Input
-                        id="scanExp"
-                         value={(mode === "photo" ? photoScanResult?.exp : cvScanResult?.exp) ?? manualExpiryDate}
-                         onChange={(e) => {
-                          const val = e.target.value;
-                          setManualExpiryDate(val);
-                          if (mode === "photo") {
-                            setPhotoScanResult((p) => ({ ...(p ?? { name: manualName || "Scanned Item" }), exp: val }));
-                          } else {
-                            setCvScanResult((p) => ({ ...(p ?? { name: manualName || "CV Scanned Item" }), exp: val }));
-                          }
+                        id="cvScanExp"
+                        type="date"
+                        value={cvScanResult?.exp ?? manualExpiryDate}
+                        onChange={(e) => {
+                          setManualExpiryDate(e.target.value);
+                          setCvScanResult((p) => ({ ...(p ?? { name: manualName || "CV Scanned Item" }), exp: e.target.value }));
                         }}
-                        placeholder="YYYY-MM-DD"
                       />
                     </div>
                   </div>
 
-                  {/* Quantity and Unit - Added for CV/Photo scan too */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor="scanQuantity">Quantity</Label>
+                      <Label htmlFor="cvScanQuantity">Quantity</Label>
                       <Input
-                        id="scanQuantity"
+                        id="cvScanQuantity"
                         type="number"
                         min="1"
                         value={manualQuantity}
@@ -903,9 +1163,9 @@ OCR text:\n${ocrTextInput}`;
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="scanUnit">Unit</Label>
+                      <Label htmlFor="cvScanUnit">Unit</Label>
                       <select
-                        id="scanUnit"
+                        id="cvScanUnit"
                         value={manualUnit}
                         onChange={(e) => setManualUnit(e.target.value)}
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -923,16 +1183,69 @@ OCR text:\n${ocrTextInput}`;
                     </div>
                   </div>
 
+                  {manualItemType === "medicine" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="cvScanMedicineDosaged">Medicine dosing</Label>
+                      <select
+                        id="cvScanMedicineDosaged"
+                        value={manualMedicineIsDosaged ? "dosaged" : "non"}
+                        onChange={(e) => setManualMedicineIsDosaged(e.target.value === "dosaged")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="non">Non-dosaged medicine</option>
+                        <option value="dosaged">Dosaged medicine</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {manualItemType === "medicine" && manualMedicineIsDosaged && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="cvScanDoseAmount">Dose amount</Label>
+                          <Input
+                            id="cvScanDoseAmount"
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={manualDoseAmount}
+                            onChange={(e) => setManualDoseAmount(e.target.value)}
+                            placeholder="1"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cvScanDoseUnit">Dose unit</Label>
+                          <Input
+                            id="cvScanDoseUnit"
+                            value={manualDoseUnit}
+                            onChange={(e) => setManualDoseUnit(e.target.value)}
+                            placeholder="tablet / ml"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cvScanDoseTimes">Dose times (HH:MM, comma-separated)</Label>
+                        <Input
+                          id="cvScanDoseTimes"
+                          value={manualDoseTimesRaw}
+                          onChange={(e) => setManualDoseTimesRaw(e.target.value)}
+                          placeholder="09:00, 21:00"
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => void runScan()}
+                      onClick={() => void runCvScanOcrOnce()}
                       className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
                     >
                       {loading ? (
                         <span className="inline-flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Scanning...
+                          CV Scanning…
                         </span>
                       ) : (
                         "Rescan"
@@ -940,9 +1253,8 @@ OCR text:\n${ocrTextInput}`;
                     </button>
 
                     <button
-                      type="button"
+                      type="submit"
                       disabled={loading || !manualName.trim()}
-                      onClick={mode === "photo" ? handleManualSubmit : handleCvSubmit}
                       className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="inline-flex items-center gap-2">
@@ -951,14 +1263,14 @@ OCR text:\n${ocrTextInput}`;
                       </span>
                     </button>
                   </div>
+                </form>
 
-                   {ocrText && (
-                    <details className="text-xs text-muted-foreground">
-                      <summary className="cursor-pointer">Detected Text</summary>
-                      <pre className="mt-2 whitespace-pre-wrap">{ocrText}</pre>
-                    </details>
-                  )}
-                </div>
+                {ocrText && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">CV OCR text</summary>
+                    <pre className="mt-2 whitespace-pre-wrap">{ocrText}</pre>
+                  </details>
+                )}
               </div>
             </GlassCard>
           </motion.div>
