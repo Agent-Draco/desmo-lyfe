@@ -159,6 +159,27 @@ const Auth = () => {
     }
   };
 
+  const handleAppleLogin = async () => {
+    setSocialLoading("apple");
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sign in with Apple",
+        variant: "destructive"
+      });
+      setSocialLoading(null);
+    }
+  };
+
   return <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <motion.div initial={{
       opacity: 0,
@@ -281,6 +302,27 @@ const Auth = () => {
                 </svg>
               )}
               {socialLoading === "google" ? "Signing in..." : "Continue with Google"}
+            </motion.button>
+
+            <motion.button
+              type="button"
+              onClick={handleAppleLogin}
+              disabled={socialLoading === "apple"}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full py-3 rounded-xl bg-white text-gray-900 font-semibold shadow-lg border border-gray-200 disabled:opacity-50 flex items-center justify-center gap-3 mt-3"
+            >
+              {socialLoading === "apple" ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 384 512">
+                  <path
+                    fill="currentColor"
+                    d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 46.9 101.4 84.7 100.8 24.3-.2 36.1-18.7 68-18.7 32.7 0 42.1 18.7 67.8 18.7 37 .3 63-63.3 83.2-96.6 6.9-11.3 15.6-27.3 21.6-43.3-66.2-19.8-85-81.9-85-146.9zM255.3 72.1c3.6-21.7-7.7-47.7-19.8-61.9-15.4-16.4-40.7-19.8-59.3-15.3-2.1 24.1 13.7 51.6 28.5 68.2 15.8 17.6 47.1 20.1 50.6-9v18z"
+                  />
+                </svg>
+              )}
+              {socialLoading === "apple" ? "Signing in..." : "Continue with Apple"}
             </motion.button>
           </div>
         </GlassCard>
