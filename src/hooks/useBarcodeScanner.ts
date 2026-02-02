@@ -273,9 +273,8 @@ export const useBarcodeScanner = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (codeReaderRef.current) {
-        codeReaderRef.current.reset();
-      }
+      // BrowserMultiFormatReader doesn't have a reset method, just clear the ref
+      codeReaderRef.current = null;
       stopScanning();
     };
   }, [stopScanning]);
