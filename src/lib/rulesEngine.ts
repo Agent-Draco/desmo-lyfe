@@ -10,10 +10,9 @@ export interface VisualStateConfig {
   showPulse: boolean;
 }
 
-export const getItemState = (expiryDate?: Date): ItemState => {
+export const getItemState = (expiryDate?: Date, now: Date = new Date()): ItemState => {
   if (!expiryDate) return 'active';
 
-  const now = new Date();
   const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   if (daysUntilExpiry < 0) return 'expired';
@@ -82,9 +81,10 @@ export interface Nudge {
 
 export const generateNudges = (inventory: any[]): Nudge[] => {
   const nudges: Nudge[] = [];
+  const now = new Date();
 
   inventory.forEach(item => {
-    const state = getItemState(item.expiry_date ? new Date(item.expiry_date) : undefined);
+    const state = getItemState(item.expiry_date ? new Date(item.expiry_date) : undefined, now);
 
     if (state === 'critical' && item.category?.toLowerCase().includes('food')) {
       nudges.push({
