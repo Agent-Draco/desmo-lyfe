@@ -356,7 +356,7 @@ OCR text:\n${ocrTextInput}`;
       const extracted = extractDates(text);
 
       const base64 = canvas.toDataURL("image/jpeg", 0.9).split(",")[1] || "";
-      
+
       // Enhanced CV object identification using Google Vision
       let visionName: string | undefined;
       try {
