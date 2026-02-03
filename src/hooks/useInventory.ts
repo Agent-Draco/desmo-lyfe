@@ -112,6 +112,7 @@ export const useInventory = (householdId: string | null) => {
       });
 
       if (expiredItems.length > 0) {
+        // Reverted to loop deletion due to issues with bulk delete
         for (const item of expiredItems) {
           await deleteItem(item.id);
         }
