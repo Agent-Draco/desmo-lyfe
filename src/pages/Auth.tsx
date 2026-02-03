@@ -42,7 +42,7 @@ const Auth = () => {
       }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        navigate("/", {
+        navigate("/dashboard", {
           replace: true
         });
       }
@@ -53,7 +53,7 @@ const Auth = () => {
       }
     }) => {
       if (session) {
-        navigate("/", {
+        navigate("/dashboard", {
           replace: true
         });
       }
