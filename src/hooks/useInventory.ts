@@ -112,24 +112,9 @@ export const useInventory = (householdId: string | null) => {
       });
 
       if (expiredItems.length > 0) {
-        const expiredIds = expiredItems.map(item => item.id);
-
-        try {
-          const { error } = await vigilSupabase
-            .from("inventory_items")
-            .delete()
-            .in("id", expiredIds);
-
-          if (error) throw error;
-
-          setItems((prev) => prev.filter((item) => !expiredIds.includes(item.id)));
-
-          toast({
-            title: "Cleanup complete",
-            description: `Removed ${expiredIds.length} expired item${expiredIds.length !== 1 ? 's' : ''}`,
-          });
-        } catch (error) {
-          console.error("Error cleaning up expired items:", error);
+        // Reverted to loop deletion due to issues with bulk delete
+        for (const item of expiredItems) {
+          await deleteItem(item.id);
         }
       }
     };
@@ -141,7 +126,7 @@ export const useInventory = (householdId: string | null) => {
     cleanupExpiredItems();
 
     return () => clearInterval(cleanupInterval);
-  }, [householdId, items, toast]);
+  }, [householdId, items, deleteItem]);
 
   // Real-time subscription
   useEffect(() => {
