@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,32 +26,20 @@ const PageLoader = () => (
 );
 
 const App = () => {
-  const [showSplash, setShowSplash] = useState(() => {
-    // Only show splash on first visit per session AND only on root path
-    if (typeof window !== "undefined") {
-      const isRootPath = window.location.pathname === "/";
-      const hasSeenSplash = sessionStorage.getItem("asterisk-splash-seen");
-      return isRootPath && !hasSeenSplash;
-    }
-    return false;
-  });
+  const [showSplash, setShowSplash] = useState(true);
 
   const handleSplashComplete = () => {
-    sessionStorage.setItem("asterisk-splash-seen", "true");
     setShowSplash(false);
   };
 
-  // Clear splash flag when testing - remove this line after testing
-  useEffect(() => {
-    // Uncomment below to reset splash for testing:
-    // sessionStorage.removeItem("asterisk-splash-seen");
-  }, []);
+  if (showSplash) {
+    return <SplashScreen onComplete={handleSplashComplete} />;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
           <Toaster />
           <Sonner />
           <BrowserRouter>
