@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AsteRisk | Connection Interrupted</title>
+    <title>AsteRISK | Connection Interrupted</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -150,6 +150,8 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            cursor: pointer;
+            border: none;
         }
 
         .retry-button:hover {
@@ -159,48 +161,36 @@
     </style>
 </head>
 <body>
-
-    <!-- Refraction Blobs -->
     <div class="bg-blob blob-1"></div>
     <div class="bg-blob blob-2"></div>
 
-    <!-- Main Container -->
     <div class="glass-panel pulse-amber">
-        <span class="node-tag">Protocol: Offline</span>
-        
         <div class="offline-icon-container">
-            <i data-lucide="wifi-off" class="text-amber-500 w-10 h-10"></i>
-            <div class="alert-dot animate-pulse"></div>
+            <i data-lucide="wifi-off" class="w-10 h-10 text-amber-500"></i>
+            <div class="alert-dot"></div>
         </div>
 
+        <span class="node-tag">Protocol: Offline</span>
+        
         <h1>Connection Lost</h1>
+
         <p class="description">
-            Vigil Cloud synchronization has paused. <br>
-            Please verify your network configuration to restore the handshake for <strong>Node VGL-043</strong>.
+            Vigil Cloud synchronization has paused. 
+            Please verify your network configuration to restore the handshake for Node VGL-043.
         </p>
 
-        <button onclick="window.location.reload()" class="retry-button">
+        <button class="retry-button" onclick="window.location.reload()">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
             Restore Handshake
         </button>
-
-        <!-- Footer inside the div -->
+        
         <div class="internal-footer">
             Terra LLC. 2026 | AsteRISK Home 1.0.1
         </div>
     </div>
 
     <script>
-        // Initialize Lucide Icons
         lucide.createIcons();
-
-        // Optional: Listen for online event to auto-refresh
-        window.addEventListener('online', () => {
-            console.log('Handshake restorable. Reconnecting...');
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        });
     </script>
 </body>
 </html>
