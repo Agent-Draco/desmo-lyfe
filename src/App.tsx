@@ -27,15 +27,25 @@ const PageLoader = () => (
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(() => {
-    // Only show splash on first visit per session
-    const hasSeenSplash = sessionStorage.getItem("asterisk-splash-seen");
-    return !hasSeenSplash;
+    // Only show splash on first visit per session AND only on root path
+    if (typeof window !== "undefined") {
+      const isRootPath = window.location.pathname === "/";
+      const hasSeenSplash = sessionStorage.getItem("asterisk-splash-seen");
+      return isRootPath && !hasSeenSplash;
+    }
+    return false;
   });
 
   const handleSplashComplete = () => {
     sessionStorage.setItem("asterisk-splash-seen", "true");
     setShowSplash(false);
   };
+
+  // Clear splash flag when testing - remove this line after testing
+  useEffect(() => {
+    // Uncomment below to reset splash for testing:
+    // sessionStorage.removeItem("asterisk-splash-seen");
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
