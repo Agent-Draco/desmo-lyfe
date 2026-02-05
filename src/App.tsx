@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Loader2 } from "lucide-react";
 import { SplashScreen } from "@/components/SplashScreen";
+import { supabase } from "@/integrations/supabase/client";
 
 // Lazy load pages for code splitting
 const Landing = lazy(() => import("./pages/Landing"));
@@ -27,6 +28,35 @@ const PageLoader = () => (
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    if (window.MedianBridge) {
+      window.MedianBridge.ready(() => {
+        console.log("Median Bridge initialized");
+      });
+
+      window.MedianBridge.on("authCallback", async (data: any) => {
+        console.log("OAuth callback received:", data);
+
+        if (data?.access_token && data?.refresh_token) {
+          try {
+            const { error } = await supabase.auth.setSession({
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+            });
+
+            if (error) {
+              console.error("Error setting session from Median callback:", error);
+            } else {
+              console.log("Session updated successfully from Median callback");
+            }
+          } catch (e) {
+            console.error("Exception handling Median auth callback:", e);
+          }
+        }
+      });
+    }
+  }, []);
 
   const handleSplashComplete = () => {
     setShowSplash(false);
