@@ -60,7 +60,7 @@ const Index = () => {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate("/auth");
+      navigate("/");
     } else if (!authLoading && user && !hasHousehold) {
       navigate("/onboarding");
     }

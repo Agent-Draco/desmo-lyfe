@@ -34,7 +34,7 @@ const Onboarding = () => {
       .maybeSingle();
 
     if (profile?.household_id) {
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   };
 
@@ -77,7 +77,7 @@ const Onboarding = () => {
         description: `Welcome to ${household.name}. Your invite code is ${household.invite_code}`,
       });
 
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -131,7 +131,7 @@ const Onboarding = () => {
         description: `Welcome to ${household.name}`,
       });
 
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (error: any) {
       toast({
         title: "Error",

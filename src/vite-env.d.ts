@@ -37,3 +37,12 @@ declare module "*.svg" {
   const src: string;
   export default src;
 }
+
+interface MedianBridge {
+  ready(callback: () => void): void;
+  on(event: string, callback: (data: any) => void): void;
+}
+
+interface Window {
+  MedianBridge?: MedianBridge;
+}
