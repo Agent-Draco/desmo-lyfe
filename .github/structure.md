@@ -6,6 +6,7 @@ AI coordination and project documentation files.
 ## Files
 
 - **ai_comments.md** - AI communication log
+- **ai_instructions.md** - AI usage guidelines
 - **Changes.md** - Project change log
 - **Jules_Instructions.md** - Agent instructions
 
