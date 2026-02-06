@@ -38,6 +38,31 @@ const App = () => {
       window.MedianBridge.on("authCallback", async (data: any) => {
         console.log("OAuth callback received:", data);
 
+        // Verify state token if present in callback
+        const receivedState = data?.state;
+        const storedState = localStorage.getItem("oauth_state");
+        const storedTimestamp = localStorage.getItem("oauth_timestamp");
+
+        if (receivedState && storedState) {
+          if (receivedState !== storedState) {
+            console.error("OAuth state mismatch. Possible CSRF attack.");
+            return;
+          }
+
+          // Check for 1 hour expiration (3600000 ms)
+          const now = Date.now();
+          if (storedTimestamp && now - parseInt(storedTimestamp) > 3600000) {
+            console.error("OAuth callback received after 1 hour timeout.");
+            localStorage.removeItem("oauth_state");
+            localStorage.removeItem("oauth_timestamp");
+            return;
+          }
+
+          // Clean up stored state
+          localStorage.removeItem("oauth_state");
+          localStorage.removeItem("oauth_timestamp");
+        }
+
         if (data?.access_token && data?.refresh_token) {
           try {
             const { error } = await supabase.auth.setSession({

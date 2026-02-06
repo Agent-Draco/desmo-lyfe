@@ -7,7 +7,7 @@ const lovableAuth = createLovableAuth({});
 
 export const lovable = {
   auth: {
-    signInWithOAuth: async (provider: "google" | "apple", opts?: { redirect_uri?: string }) => {
+    signInWithOAuth: async (provider: "google" | "apple", opts?: { redirect_uri?: string, options?: any }) => {
       const result = await lovableAuth.signInWithOAuth(provider, {
         ...opts,
       });
