@@ -145,8 +145,18 @@ const Auth = () => {
   const handleGoogleLogin = async () => {
     setSocialLoading("google");
     try {
+      // Generate and store state token for CSRF protection
+      const state = crypto.randomUUID();
+      localStorage.setItem("oauth_state", state);
+      localStorage.setItem("oauth_timestamp", Date.now().toString());
+
       const { error } = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
+        options: {
+          queryParams: {
+            state: state,
+          }
+        }
       });
       if (error) throw error;
     } catch (error: any) {
@@ -162,8 +172,18 @@ const Auth = () => {
   const handleAppleLogin = async () => {
     setSocialLoading("apple");
     try {
+      // Generate and store state token for CSRF protection
+      const state = crypto.randomUUID();
+      localStorage.setItem("oauth_state", state);
+      localStorage.setItem("oauth_timestamp", Date.now().toString());
+
       const { error } = await lovable.auth.signInWithOAuth("apple", {
         redirect_uri: window.location.origin,
+        options: {
+          queryParams: {
+            state: state,
+          }
+        }
       });
       if (error) throw error;
     } catch (error: any) {
