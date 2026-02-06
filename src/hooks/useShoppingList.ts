@@ -19,6 +19,20 @@ export const useShoppingList = (householdId: string | null) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const upsertItemById = useCallback((item: ShoppingListItem) => {
+    setItems((prev) => {
+      const existingIndex = prev.findIndex((existing) => existing.id === item.id);
+
+      if (existingIndex === -1) {
+        return [item, ...prev];
+      }
+
+      return prev.map((existing) =>
+        existing.id === item.id ? { ...existing, ...item } : existing
+      );
+    });
+  }, []);
+
   const fetchItems = useCallback(async () => {
     if (!householdId) {
       setItems([]);
@@ -62,15 +76,9 @@ export const useShoppingList = (householdId: string | null) => {
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setItems((prev) => [payload.new as ShoppingListItem, ...prev]);
+            upsertItemById(payload.new as ShoppingListItem);
           } else if (payload.eventType === "UPDATE") {
-            setItems((prev) =>
-              prev.map((item) =>
-                item.id === payload.new.id
-                  ? { ...item, ...payload.new }
-                  : item
-              )
-            );
+            upsertItemById(payload.new as ShoppingListItem);
           } else if (payload.eventType === "DELETE") {
             setItems((prev) =>
               prev.filter((item) => item.id !== payload.old.id)
@@ -83,7 +91,7 @@ export const useShoppingList = (householdId: string | null) => {
     return () => {
       vigilSupabase.removeChannel(channel);
     };
-  }, [householdId]);
+  }, [householdId, upsertItemById]);
 
   const addItem = async (item: { item_name: string; quantity?: number }) => {
     if (!householdId) return null;
@@ -103,7 +111,7 @@ export const useShoppingList = (householdId: string | null) => {
 
       // Optimistically add to local state so UI updates without reload
       if (data) {
-        setItems((prev) => [data as ShoppingListItem, ...prev]);
+        upsertItemById(data as ShoppingListItem);
       }
 
       toast({
