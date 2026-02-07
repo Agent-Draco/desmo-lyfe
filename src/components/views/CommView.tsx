@@ -75,6 +75,18 @@ interface Message {
   created_at: string;
 }
 
+interface ListingFormData {
+  title: string;
+  description: string;
+  category: string;
+  condition: string;
+  mode: "s-comm" | "b-comm";
+  item_name: string;
+  quantity: number;
+  unit: string;
+  expiry_date: string;
+}
+
 export const CommView = ({ household, currentUserId, inventory = [] }: CommViewProps) => {
   const [activeMode, setActiveMode] = useState<"s-comm" | "b-comm">("s-comm");
   const [activeView, setActiveView] = useState<"browse" | "inventory" | "my-listings" | "requests" | "chat">("browse");
@@ -178,7 +190,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
     }
   };
 
-  const createListing = async (formData: any) => {
+  const createListing = async (formData: ListingFormData) => {
     if (!currentUserId) {
       setError("User not authenticated. Please sign in to create a listing.");
       return;
@@ -189,21 +201,29 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
     setSuccess(null);
     
     try {
-      const chosenMode: "s-comm" | "b-comm" = (formData?.mode ?? activeMode) as any;
+      const chosenMode: "s-comm" | "b-comm" = formData.mode === "b-comm" ? "b-comm" : "s-comm";
+      const title = formData.title.trim();
+      const description = formData.description.trim();
+      const quantity = Number.isFinite(formData.quantity) ? Math.max(1, Math.floor(formData.quantity)) : 1;
+
+      if (!title || !description) {
+        setError("Title and description are required.");
+        return;
+      }
       
       // Prepare the data for insertion
       const listingData = {
-        title: formData.title,
-        description: formData.description,
+        title,
+        description,
         category: formData.category,
         condition: formData.condition,
         mode: chosenMode,
         lister_id: currentUserId,
         lister_name: household?.name || "Anonymous",
         status: "active",
-        item_name: formData.item_name || null,
-        quantity: formData.quantity || 1,
-        unit: formData.unit || null,
+        item_name: formData.item_name.trim() || null,
+        quantity,
+        unit: formData.unit.trim() || null,
         expiry_date: formData.expiry_date || null,
       };
 
@@ -215,7 +235,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
       if (error) {
         console.error("Database error:", error);
         setError(`Failed to create listing: ${error.message}`);
-        throw error;
+        return;
       }
 
       console.log("Listing created successfully:", data);
@@ -227,7 +247,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
       await fetchListings(chosenMode);
     } catch (error) {
       console.error("Error creating listing:", error);
-      setError("Failed to create listing. Please try again.");
+      setError((prev) => prev ?? "Failed to create listing. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -721,7 +741,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
 };
 
 interface CreateListingFormProps {
-  onSubmit: (data: any) => Promise<void> | void;
+  onSubmit: (data: ListingFormData) => Promise<void> | void;
   onCancel: () => void;
   loading?: boolean;
   categories: string[];
@@ -737,7 +757,7 @@ interface CreateListingFormProps {
 }
 
 const CreateListingForm = ({ onSubmit, onCancel, loading, categories, conditions, initialMode, prefillData }: CreateListingFormProps) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ListingFormData>({
     title: prefillData?.title || "",
     description: prefillData?.description || "",
     category: prefillData?.category || categories[0],
@@ -869,7 +889,11 @@ const CreateListingForm = ({ onSubmit, onCancel, loading, categories, conditions
               type="number"
               min={1}
               value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) })}
+              onChange={(e) => {
+                const value = e.target.value;
+                const parsed = Number.parseInt(value, 10);
+                setFormData({ ...formData, quantity: Number.isNaN(parsed) ? 1 : Math.max(1, parsed) });
+              }}
               className="w-full px-4 py-2 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <select
