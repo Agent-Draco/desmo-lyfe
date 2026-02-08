@@ -64,11 +64,10 @@ const Onboarding = () => {
 
       if (householdError) throw householdError;
 
-      // Update profile with household_id
+      // Upsert profile with household_id (creates profile if it doesn't exist)
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ household_id: household.id })
-        .eq("id", user.id);
+        .upsert({ id: user.id, household_id: household.id }, { onConflict: 'id' });
 
       if (profileError) throw profileError;
 
@@ -118,11 +117,10 @@ const Onboarding = () => {
         throw new Error("Invalid invite code. Please check and try again.");
       }
 
-      // Update profile with household_id
+      // Upsert profile with household_id (creates profile if it doesn't exist)
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ household_id: household.id })
-        .eq("id", user.id);
+        .upsert({ id: user.id, household_id: household.id }, { onConflict: 'id' });
 
       if (profileError) throw profileError;
 
