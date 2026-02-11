@@ -47,18 +47,21 @@ export type Database = {
       households: {
         Row: {
           created_at: string
+          creator_id: string | null
           id: string
           invite_code: string
           name: string
         }
         Insert: {
           created_at?: string
+          creator_id?: string | null
           id?: string
           invite_code?: string
           name: string
         }
         Update: {
           created_at?: string
+          creator_id?: string | null
           id?: string
           invite_code?: string
           name?: string
@@ -119,6 +122,51 @@ export type Database = {
           {
             foreignKeyName: "inventory_items_household_id_fkey"
             columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merge_requests: {
+        Row: {
+          created_at: string
+          id: string
+          requester_household_id: string
+          requester_id: string
+          status: string
+          target_household_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          requester_household_id: string
+          requester_id: string
+          status?: string
+          target_household_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          requester_household_id?: string
+          requester_id?: string
+          status?: string
+          target_household_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merge_requests_requester_household_id_fkey"
+            columns: ["requester_household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merge_requests_target_household_id_fkey"
+            columns: ["target_household_id"]
             isOneToOne: false
             referencedRelation: "households"
             referencedColumns: ["id"]
