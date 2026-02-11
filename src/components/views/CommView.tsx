@@ -114,16 +114,18 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
   const fetchListings = async (modeOverride?: "s-comm" | "b-comm") => {
     setLoading(true);
     try {
-      const mode = modeOverride ?? activeMode;
+      const targetMode = modeOverride ?? activeMode;
+      // Fetch all active listings and filter by mode client-side
+      // because the column name "mode" conflicts with PostgreSQL's mode() aggregate
       const { data, error } = await vigilSupabase
         .from("listings")
         .select("*")
-        .eq("mode", mode)
         .eq("status", "active")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setListings((data as Listing[]) || []);
+      const filtered = ((data as any[]) || []).filter((l: any) => l.mode === targetMode);
+      setListings(filtered as Listing[]);
     } catch (error) {
       console.error("Error fetching listings:", error);
     } finally {
@@ -153,11 +155,17 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
       const { data, error } = await vigilSupabase
         .from("chats")
         .select("*")
-        .or(`participant1_id.eq.${currentUserId},participant2_id.eq.${currentUserId}`)
         .order("updated_at", { ascending: false });
 
-      if (error) throw error;
-      setChats((data as Chat[]) || []);
+      if (error) {
+        console.warn("Chats table may not exist yet:", error.message);
+        return;
+      }
+      // Filter client-side for participant matching
+      const userChats = ((data as any[]) || []).filter(
+        (c: any) => c.participant1_id === currentUserId || c.participant2_id === currentUserId
+      );
+      setChats(userChats as Chat[]);
     } catch (error) {
       console.error("Error fetching chats:", error);
     }
@@ -191,11 +199,10 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
     try {
       const chosenMode: "s-comm" | "b-comm" = (formData?.mode ?? activeMode) as any;
       
-      // Prepare the data for insertion
-      const listingData = {
+      // Prepare the data for insertion (omit 'category' as it may not exist in the external DB)
+      const listingData: Record<string, any> = {
         title: formData.title,
         description: formData.description,
-        category: formData.category,
         condition: formData.condition,
         mode: chosenMode,
         lister_id: currentUserId,
@@ -206,6 +213,10 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
         unit: formData.unit || null,
         expiry_date: formData.expiry_date || null,
       };
+      // Only include category if the table supports it
+      if (formData.category) {
+        listingData.category = formData.category;
+      }
 
       const { data, error } = await vigilSupabase
         .from("listings")
@@ -214,6 +225,22 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
 
       if (error) {
         console.error("Database error:", error);
+        // If category column doesn't exist, retry without it
+        if (error.message?.includes("category")) {
+          delete listingData.category;
+          const retry = await vigilSupabase.from("listings").insert(listingData).select();
+          if (retry.error) {
+            setError(`Failed to create listing: ${retry.error.message}`);
+            throw retry.error;
+          }
+          console.log("Listing created successfully (without category):", retry.data);
+          setSuccess("Listing created successfully!");
+          setShowCreateForm(false);
+          setSelectedInventoryItem(null);
+          setActiveMode(chosenMode);
+          await fetchListings(chosenMode);
+          return;
+        }
         setError(`Failed to create listing: ${error.message}`);
         throw error;
       }
@@ -303,7 +330,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
       const matchesSearch = !q ||
         listing.title.toLowerCase().includes(q) ||
         listing.description.toLowerCase().includes(q);
-      const matchesCategory = selectedCategory === "all" || listing.category === selectedCategory;
+      const matchesCategory = selectedCategory === "all" || (listing.category && listing.category === selectedCategory);
       return matchesSearch && matchesCategory;
     });
   }, [listings, searchQuery, selectedCategory]);
@@ -680,7 +707,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"
             onClick={() => {
               setShowCreateForm(false);
               setSelectedInventoryItem(null);
