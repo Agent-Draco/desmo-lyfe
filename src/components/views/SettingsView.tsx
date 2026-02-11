@@ -72,13 +72,14 @@ export const SettingsView = ({
       </motion.div>
 
       {/* Profile Card */}
-      <GlassCard className="mb-6 flex items-center gap-4" delay={0.1}>
+      <GlassCard className="mb-6 flex items-center gap-4 cursor-pointer" delay={0.1} onClick={() => navigate('/profile')}>
         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/30 flex items-center justify-center">
           <span className="text-2xl font-semibold text-primary">{displayInitial}</span>
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-foreground">{profile?.display_name || "User"}</h3>
           <p className="text-sm text-muted-foreground">{household?.name || "No household"}</p>
+          <p className="text-xs text-primary mt-1">Manage profile & household →</p>
         </div>
         <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </GlassCard>

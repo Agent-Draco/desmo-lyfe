@@ -15,6 +15,7 @@ const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const VigilSetup = lazy(() => import("./pages/VigilSetup"));
+const ProfileManagement = lazy(() => import("./pages/ProfileManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -105,6 +106,7 @@ const App = () => {
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/vigil-setup" element={<VigilSetup />} />
+                <Route path="/profile" element={<ProfileManagement />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

@@ -58,7 +58,7 @@ const Onboarding = () => {
       // Create household
       const { data: household, error: householdError } = await supabase
         .from("households")
-        .insert({ name: householdName.trim() })
+        .insert({ name: householdName.trim(), creator_id: user.id } as any)
         .select()
         .single();
 
