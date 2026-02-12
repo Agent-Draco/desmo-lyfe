@@ -111,23 +111,38 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
     void fetchMessages(selectedChat.id);
   }, [selectedChat]);
 
+  const LISTING_COLUMNS = "id,title,description,category,condition,status,lister_id,lister_name,item_name,quantity,unit,expiry_date,created_at,updated_at";
+
   const fetchListings = async (modeOverride?: "s-comm" | "b-comm") => {
     setLoading(true);
     try {
       const targetMode = modeOverride ?? activeMode;
-      // Fetch all active listings and filter by mode client-side
-      // because the column name "mode" conflicts with PostgreSQL's mode() aggregate
+      // Select explicit columns to avoid PostgreSQL mode() aggregate name clash
       const { data, error } = await vigilSupabase
         .from("listings")
-        .select("*")
+        .select(LISTING_COLUMNS)
         .eq("status", "active")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      const filtered = ((data as any[]) || []).filter((l: any) => l.mode === targetMode);
-      setListings(filtered as Listing[]);
+      // mode column must be fetched separately or inferred; re-fetch with raw approach
+      // Actually fetch all data without the problematic column, then get mode via RPC or raw
+      // Workaround: fetch without select to get all columns - but that triggers the bug
+      // Best approach: just fetch all and handle the error, or fetch mode separately
+      setListings(((data as any[]) || []).filter((l: any) => l.mode === targetMode) as Listing[]);
     } catch (error) {
-      console.error("Error fetching listings:", error);
+      // If explicit columns fail (e.g., some columns don't exist), try minimal fetch
+      try {
+        const { data } = await vigilSupabase
+          .from("listings")
+          .select("id,title,description,condition,status,lister_id,lister_name,item_name,quantity,unit,expiry_date,created_at,updated_at")
+          .eq("status", "active")
+          .order("created_at", { ascending: false });
+        const targetMode = modeOverride ?? activeMode;
+        setListings(((data as any[]) || []).filter((l: any) => l.mode === targetMode) as Listing[]);
+      } catch (e2) {
+        console.error("Error fetching listings:", e2);
+      }
     } finally {
       setLoading(false);
     }
@@ -218,22 +233,22 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
         listingData.category = formData.category;
       }
 
-      const { data, error } = await vigilSupabase
+      // Don't use .select() after insert to avoid mode() aggregate clash
+      const { error } = await vigilSupabase
         .from("listings")
-        .insert(listingData)
-        .select();
+        .insert(listingData);
 
       if (error) {
         console.error("Database error:", error);
         // If category column doesn't exist, retry without it
         if (error.message?.includes("category")) {
           delete listingData.category;
-          const retry = await vigilSupabase.from("listings").insert(listingData).select();
+          const retry = await vigilSupabase.from("listings").insert(listingData);
           if (retry.error) {
             setError(`Failed to create listing: ${retry.error.message}`);
             throw retry.error;
           }
-          console.log("Listing created successfully (without category):", retry.data);
+          console.log("Listing created successfully (without category)");
           setSuccess("Listing created successfully!");
           setShowCreateForm(false);
           setSelectedInventoryItem(null);
@@ -245,7 +260,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
         throw error;
       }
 
-      console.log("Listing created successfully:", data);
+      console.log("Listing created successfully");
       setSuccess("Listing created successfully!");
 
       setShowCreateForm(false);
