@@ -111,7 +111,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
     void fetchMessages(selectedChat.id);
   }, [selectedChat]);
 
-  const LISTING_COLUMNS = "id,title,description,category,condition,status,lister_id,lister_name,item_name,quantity,unit,expiry_date,created_at,updated_at";
+  const LISTING_COLUMNS = "id,title,description,category,condition,status,lister_id,lister_name,item_name,quantity,unit,expiry_date,created_at,updated_at,mode";
 
   const fetchListings = async (modeOverride?: "s-comm" | "b-comm") => {
     setLoading(true);
@@ -135,7 +135,7 @@ export const CommView = ({ household, currentUserId, inventory = [] }: CommViewP
       try {
         const { data } = await vigilSupabase
           .from("listings")
-          .select("id,title,description,condition,status,lister_id,lister_name,item_name,quantity,unit,expiry_date,created_at,updated_at")
+          .select("id,title,description,condition,status,lister_id,lister_name,item_name,quantity,unit,expiry_date,created_at,updated_at,mode")
           .eq("status", "active")
           .order("created_at", { ascending: false });
         const targetMode = modeOverride ?? activeMode;

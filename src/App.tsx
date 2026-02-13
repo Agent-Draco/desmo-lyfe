@@ -14,6 +14,7 @@ const Landing = lazy(() => import("./pages/Landing"));
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const HouseholdSelector = lazy(() => import("./pages/HouseholdSelector"));
 const VigilSetup = lazy(() => import("./pages/VigilSetup"));
 const ProfileManagement = lazy(() => import("./pages/ProfileManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -39,7 +40,6 @@ const App = () => {
       window.MedianBridge.on("authCallback", async (data: any) => {
         console.log("OAuth callback received:", data);
 
-        // Verify state token if present in callback
         const receivedState = data?.state;
         const storedState = localStorage.getItem("oauth_state");
         const storedTimestamp = localStorage.getItem("oauth_timestamp");
@@ -49,8 +49,6 @@ const App = () => {
             console.error("OAuth state mismatch. Possible CSRF attack.");
             return;
           }
-
-          // Check for 1 hour expiration (3600000 ms)
           const now = Date.now();
           if (storedTimestamp && now - parseInt(storedTimestamp) > 3600000) {
             console.error("OAuth callback received after 1 hour timeout.");
@@ -58,8 +56,6 @@ const App = () => {
             localStorage.removeItem("oauth_timestamp");
             return;
           }
-
-          // Clean up stored state
           localStorage.removeItem("oauth_state");
           localStorage.removeItem("oauth_timestamp");
         }
@@ -70,7 +66,6 @@ const App = () => {
               access_token: data.access_token,
               refresh_token: data.refresh_token,
             });
-
             if (error) {
               console.error("Error setting session from Median callback:", error);
             } else {
@@ -102,7 +97,10 @@ const App = () => {
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
-                <Route path="/dashboard" element={<Index />} />
+                <Route path="/households" element={<HouseholdSelector />} />
+                <Route path="/household/:householdId" element={<Index />} />
+                {/* Keep /dashboard for backward compat - redirects to /households */}
+                <Route path="/dashboard" element={<HouseholdSelector />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/vigil-setup" element={<VigilSetup />} />

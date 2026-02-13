@@ -64,19 +64,23 @@ const Onboarding = () => {
 
       if (householdError) throw householdError;
 
-      // Upsert profile with household_id (creates profile if it doesn't exist)
+      // Upsert profile with household_id
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert({ id: user.id, household_id: household.id }, { onConflict: 'id' });
-
       if (profileError) throw profileError;
+
+      // Add to household_members join table
+      await supabase
+        .from("household_members")
+        .insert({ user_id: user.id, household_id: household.id } as any);
 
       toast({
         title: "Household created!",
         description: `Welcome to ${household.name}. Your invite code is ${household.invite_code}`,
       });
 
-      navigate("/dashboard", { replace: true });
+      navigate("/households", { replace: true });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -117,19 +121,23 @@ const Onboarding = () => {
         throw new Error("Invalid invite code. Please check and try again.");
       }
 
-      // Upsert profile with household_id (creates profile if it doesn't exist)
+      // Upsert profile with household_id
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert({ id: user.id, household_id: household.id }, { onConflict: 'id' });
-
       if (profileError) throw profileError;
+
+      // Add to household_members join table
+      await supabase
+        .from("household_members")
+        .insert({ user_id: user.id, household_id: household.id } as any);
 
       toast({
         title: "Joined household!",
         description: `Welcome to ${household.name}`,
       });
 
-      navigate("/dashboard", { replace: true });
+      navigate("/households", { replace: true });
     } catch (error: any) {
       toast({
         title: "Error",
