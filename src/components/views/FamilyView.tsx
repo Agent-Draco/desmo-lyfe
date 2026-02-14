@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Users, Copy, Crown, Loader2 } from "lucide-react";
+import { Users, Copy, Loader2, UserPlus, LogOut } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import { useToast } from "@/hooks/use-toast";
 import { useHouseholdMembers, HouseholdMember } from "@/hooks/useHouseholdMembers";
-import { Household } from "@/hooks/useAuth";
+import { useAuth, Household } from "@/hooks/useAuth";
+import { InviteModal } from "@/components/InviteModal";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface FamilyViewProps {
   household: Household | null;
@@ -12,7 +16,10 @@ interface FamilyViewProps {
 
 export const FamilyView = ({ household, currentUserId }: FamilyViewProps) => {
   const { members, loading } = useHouseholdMembers(household?.id || null);
+  const { refetch } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   const handleCopyCode = () => {
     if (household?.invite_code) {
@@ -54,6 +61,44 @@ export const FamilyView = ({ household, currentUserId }: FamilyViewProps) => {
         <h2 className="text-xl font-semibold text-foreground">{household.name}</h2>
         <p className="text-sm text-muted-foreground mt-1">Manage your household members</p>
       </motion.div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3 mb-6">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setShowInviteModal(true)}
+          className="flex-1 py-3 rounded-xl bg-primary/10 text-primary font-semibold flex items-center justify-center gap-2"
+        >
+          <UserPlus className="w-5 h-5" />
+          Invite Member
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={async () => {
+            if (!household || !currentUserId) return;
+            if (!confirm(`Leave "${household.name}"? You'll need an invite to rejoin.`)) return;
+            try {
+              const { error } = await supabase
+                .from("household_members")
+                .delete()
+                .eq("user_id", currentUserId)
+                .eq("household_id", household.id);
+              if (error) throw error;
+              toast({ title: "Left household", description: `You left ${household.name}` });
+              await refetch();
+              navigate("/households");
+            } catch (err: any) {
+              toast({ title: "Error", description: err.message, variant: "destructive" });
+            }
+          }}
+          className="py-3 px-4 rounded-xl bg-destructive/10 text-destructive font-semibold flex items-center justify-center gap-2"
+        >
+          <LogOut className="w-5 h-5" />
+          Leave
+        </motion.button>
+      </div>
 
       {/* Invite Code Card */}
       <GlassCard className="mb-6" delay={0.1}>
@@ -110,6 +155,16 @@ export const FamilyView = ({ household, currentUserId }: FamilyViewProps) => {
           </GlassCard>
         ))}
       </div>
+
+      {household && (
+        <InviteModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          householdId={household.id}
+          householdName={household.name}
+          inviteCode={household.invite_code}
+        />
+      )}
     </section>
   );
 };

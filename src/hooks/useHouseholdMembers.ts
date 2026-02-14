@@ -19,10 +19,24 @@ export const useHouseholdMembers = (householdId: string | null) => {
     }
 
     try {
+      // Get member user IDs from join table, then fetch profiles
+      const { data: memberships, error: memError } = await supabase
+        .from("household_members")
+        .select("user_id")
+        .eq("household_id", householdId);
+
+      if (memError) throw memError;
+      if (!memberships || memberships.length === 0) {
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      const userIds = memberships.map((m: any) => m.user_id);
       const { data, error } = await supabase
         .from("profiles")
         .select("id, display_name, avatar_url")
-        .eq("household_id", householdId);
+        .in("id", userIds);
 
       if (error) throw error;
       setMembers(data || []);
