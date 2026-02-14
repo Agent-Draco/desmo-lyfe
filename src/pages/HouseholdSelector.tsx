@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Home, Plus, Users, ArrowRight, Loader2, Pencil, Check, X } from "lucide-react";
+import { Home, Plus, Users, ArrowRight, Loader2, Pencil, Check, X, LogOut } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,13 +48,11 @@ const HouseholdSelector = () => {
         .single();
       if (hErr) throw hErr;
 
-      // Add to join table
       const { error: mErr } = await supabase
         .from("household_members")
         .insert({ user_id: user.id, household_id: household.id } as any);
       if (mErr) throw mErr;
 
-      // Also update profile default household
       await supabase
         .from("profiles")
         .update({ household_id: household.id })
@@ -78,20 +76,70 @@ const HouseholdSelector = () => {
     setSubmitting(true);
 
     try {
-      const { data: household, error: findError } = await supabase
+      const codeInput = inviteCode.trim().toUpperCase();
+
+      // First try permanent invite code
+      let household: any = null;
+      const { data: permHousehold, error: permError } = await supabase
         .from("households")
         .select("id, name, invite_code")
-        .eq("invite_code", inviteCode.trim().toUpperCase())
+        .eq("invite_code", codeInput)
         .maybeSingle();
-      if (findError) throw findError;
-      if (!household) throw new Error("Invalid invite code.");
+      if (permError) throw permError;
+
+      if (permHousehold) {
+        household = permHousehold;
+      } else {
+        // Try OTP code (4-digit numerical)
+        const { data: invitation, error: invErr } = await supabase
+          .from("household_invitations")
+          .select("id, household_id, expires_at, used")
+          .eq("code", codeInput)
+          .eq("used", false)
+          .maybeSingle();
+        if (invErr) throw invErr;
+        if (!invitation) throw new Error("Invalid invite code.");
+
+        // Check expiry
+        if (new Date(invitation.expires_at) < new Date()) {
+          throw new Error("This code has expired. Please request a new one.");
+        }
+
+        // Mark as used
+        await supabase
+          .from("household_invitations")
+          .update({ used: true } as any)
+          .eq("id", invitation.id);
+
+        // Get household details
+        const { data: otpHousehold, error: hErr } = await supabase
+          .from("households")
+          .select("id, name, invite_code")
+          .eq("id", invitation.household_id)
+          .single();
+        if (hErr) throw hErr;
+        household = otpHousehold;
+      }
+
+      // Check if already a member
+      const { data: existingMembership } = await supabase
+        .from("household_members")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("household_id", household.id)
+        .maybeSingle();
+
+      if (existingMembership) {
+        toast({ title: "Already a member", description: `You're already in ${household.name}` });
+        navigate(`/household/${household.id}`, { replace: true });
+        return;
+      }
 
       const { error: mErr } = await supabase
         .from("household_members")
         .insert({ user_id: user.id, household_id: household.id } as any);
       if (mErr) throw mErr;
 
-      // Update profile default
       await supabase
         .from("profiles")
         .update({ household_id: household.id })
@@ -106,6 +154,41 @@ const HouseholdSelector = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleLeave = async (householdId: string, householdName: string) => {
+    if (!user) return;
+    try {
+      // Remove from join table
+      const { error } = await supabase
+        .from("household_members")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("household_id", householdId);
+      if (error) throw error;
+
+      // If profile points to this household, clear it
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("household_id")
+        .eq("id", user.id)
+        .single();
+
+      if (profileData?.household_id === householdId) {
+        // Set to another household or null
+        const remainingHouseholds = households.filter(h => h.id !== householdId);
+        const newHouseholdId = remainingHouseholds.length > 0 ? remainingHouseholds[0].id : null;
+        await supabase
+          .from("profiles")
+          .update({ household_id: newHouseholdId })
+          .eq("id", user.id);
+      }
+
+      toast({ title: "Left household", description: `You left ${householdName}` });
+      await refetch();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -162,7 +245,7 @@ const HouseholdSelector = () => {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-foreground">Join Household</h3>
-                <p className="text-sm text-muted-foreground">Enter an invite code</p>
+                <p className="text-sm text-muted-foreground">Enter an invite or one-time code</p>
               </div>
               <ArrowRight className="w-5 h-5 text-muted-foreground" />
             </GlassCard>
@@ -174,7 +257,6 @@ const HouseholdSelector = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="glass-nav fixed top-0 left-0 right-0 z-50 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -212,10 +294,7 @@ const HouseholdSelector = () => {
                     </div>
                   ) : (
                     <>
-                      <div
-                        className="flex-1 cursor-pointer"
-                        onClick={() => navigate(`/household/${h.id}`)}
-                      >
+                      <div className="flex-1 cursor-pointer" onClick={() => navigate(`/household/${h.id}`)}>
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
                             <Home className="w-6 h-6 text-primary" />
@@ -232,13 +311,24 @@ const HouseholdSelector = () => {
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Leave "${h.name}"? You'll need an invite to rejoin.`)) {
+                            handleLeave(h.id, h.name);
+                          }
+                        }}
+                        className="p-2 text-destructive/70 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                        title="Leave household"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
                       <ArrowRight className="w-5 h-5 text-muted-foreground" />
                     </>
                   )}
                 </GlassCard>
               ))}
 
-              {/* Add new household actions */}
               <div className="grid grid-cols-2 gap-3 pt-4">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -286,8 +376,9 @@ const HouseholdSelector = () => {
                 <h2 className="text-xl font-bold text-foreground mb-4">Join Household</h2>
                 <form onSubmit={handleJoin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="inviteCode">Invite Code</Label>
-                    <Input id="inviteCode" placeholder="XXXX-XXXX" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} className="font-mono text-center text-lg tracking-wider" autoFocus />
+                    <Label htmlFor="inviteCode">Invite Code or One-Time PIN</Label>
+                    <Input id="inviteCode" placeholder="XXXX-XXXX or 4-digit PIN" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} className="font-mono text-center text-lg tracking-wider" autoFocus />
+                    <p className="text-xs text-muted-foreground">Enter either a permanent invite code or a 4-digit one-time PIN</p>
                   </div>
                   <motion.button type="submit" disabled={submitting} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
                     {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />Joining...</> : "Join Household"}
