@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Bell, Moon, Shield, LogOut, ChevronRight, Settings } from "lucide-react";
+import { User, Bell, Moon, Shield, LogOut, ChevronRight, Settings, Home } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -80,6 +80,18 @@ export const SettingsView = ({
           <h3 className="font-semibold text-foreground">{profile?.display_name || "User"}</h3>
           <p className="text-sm text-muted-foreground">{household?.name || "No household"}</p>
           <p className="text-xs text-primary mt-1">Manage profile & household →</p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+      </GlassCard>
+
+      {/* Manage Households Card */}
+      <GlassCard className="mb-6 flex items-center gap-4 cursor-pointer" delay={0.13} onClick={() => navigate('/households')}>
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Home className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-medium text-foreground">Manage Households</h4>
+          <p className="text-sm text-muted-foreground">Create, join, or switch households</p>
         </div>
         <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </GlassCard>

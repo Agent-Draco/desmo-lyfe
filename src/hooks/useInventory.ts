@@ -38,10 +38,11 @@ export const useInventory = (householdId: string | null) => {
 
   const deleteItem = useCallback(async (id: string) => {
     try {
+      // External DB uses 'uuid' as the primary identifier
       const { error } = await vigilSupabase
         .from("inventory_items")
         .delete()
-        .eq("id", id);
+        .eq("uuid", id);
 
       if (error) throw error;
 
@@ -81,8 +82,10 @@ export const useInventory = (householdId: string | null) => {
       if (error) throw error;
 
       // Map DB column names to UI-friendly names
+      // External DB uses 'uuid' as the primary key while 'id' is often null
       const mappedItems: InventoryItem[] = (data || []).map((item: any) => ({
         ...item,
+        id: item.uuid || item.id || item.uuid,
         mfg_date: item.manufacturing_date ?? null,
       }));
 
@@ -255,7 +258,7 @@ export const useInventory = (householdId: string | null) => {
       const { error } = await vigilSupabase
         .from("inventory_items")
         .update(updates)
-        .eq("id", id);
+        .eq("uuid", id);
 
       if (error) throw error;
 

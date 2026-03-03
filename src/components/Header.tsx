@@ -1,17 +1,19 @@
 import { motion } from "framer-motion";
-import { Bell, Plus } from "lucide-react";
+import { Bell, Plus, ArrowLeft } from "lucide-react";
 import desmoLogo from "@/assets/asterisk.png";
 
 interface HeaderProps {
   userName?: string;
   householdName?: string;
   notificationCount?: number;
+  onBackToHouseholds?: () => void;
 }
 
 export const Header = ({ 
   userName = "Guest", 
   householdName = "My Kitchen",
-  notificationCount = 0 
+  notificationCount = 0,
+  onBackToHouseholds
 }: HeaderProps) => {
   return (
     <motion.header
@@ -22,6 +24,16 @@ export const Header = ({
     >
       <div className="max-w-4xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-4">
+          {onBackToHouseholds && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onBackToHouseholds}
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </motion.button>
+          )}
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
