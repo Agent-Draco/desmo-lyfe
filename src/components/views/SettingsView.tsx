@@ -59,6 +59,7 @@ export const SettingsView = ({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [privacyMode, setPrivacyMode] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const displayInitial = profile?.display_name?.charAt(0).toUpperCase() || "U";
   return <section>
       <motion.div initial={{
