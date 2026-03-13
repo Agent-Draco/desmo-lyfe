@@ -110,6 +110,20 @@ export const SettingsView = ({
         <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </GlassCard>
 
+      {/* Invite Members Card */}
+      {household && (
+        <GlassCard className="mb-6 flex items-center gap-4 cursor-pointer" delay={0.17} onClick={() => setShowInviteModal(true)}>
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <UserPlus className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-foreground">Invite Members</h4>
+            <p className="text-sm text-muted-foreground">OTP, invite code, or share link</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </GlassCard>
+      )}
+
       {/* Settings Items */}
       <div className="space-y-3">
         {/* Profile Section */}
