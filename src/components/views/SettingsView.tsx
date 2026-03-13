@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Bell, Moon, Shield, LogOut, ChevronRight, Settings, Home } from "lucide-react";
+import { User, Bell, Moon, Shield, LogOut, ChevronRight, Settings, Home, UserPlus } from "lucide-react";
 import { GlassCard } from "@/components/GlassCard";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { InviteModal } from "@/components/InviteModal";
 interface Profile {
   id: string;
   display_name: string | null;
@@ -58,6 +59,7 @@ export const SettingsView = ({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [privacyMode, setPrivacyMode] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const displayInitial = profile?.display_name?.charAt(0).toUpperCase() || "U";
   return <section>
       <motion.div initial={{
@@ -107,6 +109,20 @@ export const SettingsView = ({
         </div>
         <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </GlassCard>
+
+      {/* Invite Members Card */}
+      {household && (
+        <GlassCard className="mb-6 flex items-center gap-4 cursor-pointer" delay={0.17} onClick={() => setShowInviteModal(true)}>
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <UserPlus className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-foreground">Invite Members</h4>
+            <p className="text-sm text-muted-foreground">OTP, invite code, or share link</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </GlassCard>
+      )}
 
       {/* Settings Items */}
       <div className="space-y-3">
@@ -283,5 +299,16 @@ export const SettingsView = ({
         <LogOut className="w-5 h-5" />
         Sign Out
       </motion.button>
+
+      {/* Invite Modal */}
+      {household && (
+        <InviteModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          householdId={household.id}
+          householdName={household.name}
+          inviteCode={household.invite_code}
+        />
+      )}
     </section>;
 };
