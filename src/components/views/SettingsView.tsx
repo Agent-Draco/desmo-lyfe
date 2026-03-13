@@ -299,5 +299,16 @@ export const SettingsView = ({
         <LogOut className="w-5 h-5" />
         Sign Out
       </motion.button>
+
+      {/* Invite Modal */}
+      {household && (
+        <InviteModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          householdId={household.id}
+          householdName={household.name}
+          inviteCode={household.invite_code}
+        />
+      )}
     </section>;
 };
